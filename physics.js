@@ -2,9 +2,10 @@
 (function (root) {
   const KM_PER_UNIT = 2;          // 1物理単位 = 2km
   const DENSITY = 0.001;          // 全県共通の密度(質量∝面積)
-  const E_MAX = 48;               // パワー100%時のエネルギー(大阪府の面積が基準)
+  const E_MAX = 1000;             // パワー100%時のエネルギー(大阪府の面積が基準)
   const E_REF_AREA = 1860;        // 基準の面積(km²)
-  const E_AREA_EXP = 0.7;         // 大きい県ほど火薬も増える度合い(0=全県同じ、1=全県同じ初速)
+  const E_AREA_EXP = 0.6;         // 大きい県ほど火薬も増える度合い(0=全県同じ、1=全県同じ初速)
+  const AIR_DRAG = 0.000008;      // 空気抵抗(進行方向から見た幅 × 速さ² ÷ 重さ で減速)
   const GRAVITY_SCALE = 0.001;
   const GROUND_Y = 0;
   const GROUND_DRAG = 0.004;      // 接地中の抵抗(転がり抵抗の代わり)
@@ -59,6 +60,19 @@
 
     state.step = function (dt = 1000 / 60) {
       if (!state.launched || state.settled) return;
+      // 空気抵抗: 重い県ほど減速しにくく、細長い県は回転の向きで受ける風が変わる
+      if (body.bounds.max.y < GROUND_Y - 0.5) {
+        const v = body.velocity, sp = Math.hypot(v.x, v.y);
+        if (sp > 0.01) {
+          const nx = -v.y / sp, ny = v.x / sp;
+          let lo = Infinity, hi = -Infinity;
+          for (let i = 1; i < body.parts.length; i++) {
+            for (const q of body.parts[i].vertices) { const d = q.x * nx + q.y * ny; if (d < lo) lo = d; if (d > hi) hi = d; }
+          }
+          const k = Math.min(0.5, AIR_DRAG * (hi - lo) * sp / body.mass);
+          Body.setVelocity(body, { x: v.x * (1 - k), y: v.y * (1 - k) });
+        }
+      }
       Engine.update(engine, dt);
       state.steps++;
       // 接地中は地面の抵抗(転がり抵抗)をかける
