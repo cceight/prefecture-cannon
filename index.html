@@ -187,7 +187,10 @@
     W = cv.clientWidth; H = cv.clientHeight;
     cv.width = W * DPR; cv.height = H * DPR;
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', () => {
+    resize();
+    if (game && cam && (phase === 'angle' || phase === 'power')) cam.scale = targetScale();
+  });
 
   let pref, game, phase, angle, power, gaugeT, cam, prevPose, accum, trail, lastTs, settledAt;
   const PLAY_SPEED = 0.7;         // 再生速度(スロー気味)
@@ -197,18 +200,17 @@
     pref = SHAPES.find(p => p.id === id);
     game = PrefPhysics.createGame(Matter, pref);
     phase = 'angle'; angle = 0; power = 0; gaugeT = 0; accum = 0; trail = []; settledAt = 0;
-    const r = PrefPhysics.radiusOf(game.body);
-    cam = { x: game.body.position.x + r * 1.2, y: game.startY, scale: 0 };
-    cam.scale = targetScale();
-    prevPose = pose();
     $('select').classList.remove('on'); $('play').classList.add('on');
+    resize();
+    const r = PrefPhysics.radiusOf(game.body);
+    cam = { x: game.body.position.x + r * 1.2, y: game.startY, scale: targetScale() };
+    prevPose = pose();
     $('result').classList.remove('on');
     $('hudName').textContent = pref.name;
     $('hudInfo').textContent = `面積 ${pref.area.toLocaleString()} km²` + (best[id] ? ` ／ ベスト ${fmt(best[id].d)} km` : '');
     $('hudDist').textContent = '0'; $('hudHeight').textContent = '';
     $('gauges').style.display = ''; $('tapMsg').textContent = 'タップで角度を止めて';
     $('gAng').className = 'gauge ang'; $('gPow').className = 'gauge pow dim';
-    resize();
     lastTs = performance.now();
   }
 
@@ -248,7 +250,8 @@
     const h = Math.max(0, -game.body.bounds.min.y);
     const worldH = Math.max(r * 7, h * 1.3 + r * 2.5) / 0.78;
     const worldW = r * 9;
-    return Math.min(H / worldH, W / worldW);
+    const sc = Math.min(H / worldH, W / worldW);
+    return sc > 0 && isFinite(sc) ? sc : (cam && cam.scale > 0 ? cam.scale : 1);
   }
 
   let shake = 0;
@@ -293,6 +296,7 @@
 
   function draw(p) {
     const s = cam.scale;
+    if (!(s > 0) || !isFinite(s) || !W || !H) return;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // 空
     const sky = ctx.createLinearGradient(0, 0, 0, H);
@@ -321,8 +325,8 @@
     const tick = steps.find(v => v / kmPerPx > 90) || 5000;
     const leftKm = (cam.x - W * 0.5 / s - game.startX) * KPU, rightKm = (cam.x + W * 0.5 / s - game.startX) * KPU;
     ctx.font = '800 12px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
-    for (let km = Math.ceil(leftKm / tick) * tick; km <= rightKm; km += tick) {
-      if (km < 0) continue;
+    const firstKm = Math.max(0, Math.ceil(leftKm / tick) * tick);
+    for (let km = firstKm, n = 0; km <= rightKm && n < 200; km += tick, n++) {
       const x = toX(game.startX + km / KPU);
       ctx.fillStyle = '#1f2440'; ctx.fillRect(x - 1, toY(0), 2, 10);
       ctx.fillText((km || 0).toLocaleString() + 'km', x, toY(0) + 26);
