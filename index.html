@@ -31,7 +31,6 @@
   .logo { font-family: "Dela Gothic One", sans-serif; font-size: clamp(30px, 7vw, 54px); line-height: 1; margin: 0;
     color: var(--red); text-shadow: 3px 3px 0 var(--ink); letter-spacing: .02em; }
   .logo small { display: block; font-size: .32em; color: var(--ink); text-shadow: none; letter-spacing: .3em; margin-top: 8px; }
-  .lead { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; flex: 1; min-width: 220px; }
   .tabs { max-width: 980px; margin: 0 auto 12px; display: flex; gap: 6px; flex-wrap: wrap; }
   .tabs button { border: 2px solid var(--ink); background: var(--card); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
   .tabs button.on { background: var(--ink); color: var(--paper); }
@@ -92,7 +91,6 @@
 <section id="select" class="screen on">
   <div class="head">
     <h1 class="logo">都道府県キャノン<small>PREFECTURE CANNON</small></h1>
-    <p class="lead">都道府県を、実寸大のまま大砲で撃ち出すわ。小さい県は軽くて勢いはあるけど、風に負けやすい。大きい県は重くて風に強く、図体のぶん前に出る。記録は県の一番前の端まで。どの県を、何度で撃つかが勝負よ。</p>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
@@ -100,7 +98,7 @@
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=8" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=9" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -131,8 +129,8 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=8"></script>
-<script src="physics.js?v=8"></script>
+<script src="shapes.js?v=9"></script>
+<script src="physics.js?v=9"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -163,8 +161,8 @@
 
   // ===== 保存(端末内の自己ベスト) =====
   const store = {
-    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest2') || '{}'); } catch { return {}; } },
-    set(v) { try { localStorage.setItem('prefCannonBest2', JSON.stringify(v)); } catch {} },
+    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest3') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('prefCannonBest3', JSON.stringify(v)); } catch {} },
   };
   let best = store.get();
 
@@ -385,7 +383,7 @@
     if (!$('play').classList.contains('on') || !game) return;
     const dt = Math.min(50, ts - lastTs); lastTs = ts;
 
-    if (phase === 'angle') { gaugeT += dt; angle = Math.round(tri(gaugeT, 2200) * 90); }
+    if (phase === 'angle') { gaugeT += dt; angle = Math.round(tri(gaugeT, 2200) * 90); game.aim(angle); prevPose = pose(); }
     if (phase === 'power') { gaugeT += dt; power = Math.max(1, Math.round(tri(gaugeT, 1300) * 100)); }
 
     let alpha = 1;
@@ -476,8 +474,8 @@
     ctx.fillStyle = 'rgba(31,36,64,.35)';
     for (const t of trail) { ctx.beginPath(); ctx.arc(toX(t.x), toY(t.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
 
-    // 大砲(県の大きさに合わせて巨大化)
-    const r = PrefPhysics.radiusOf(game.body);
+    // 大砲(県の大きさに合わせて巨大化。火薬の多い県はさらに一回り大きく)
+    const r = game.size * ((PrefPhysics.CANNON_BOOST[pref.id] || 1) > 1 ? 1.2 : 1);
     const baseX = game.startX - r * 1.15, baseY = 0;
     const th = -angle * Math.PI / 180;
     ctx.save();
@@ -505,13 +503,15 @@
     ctx.translate(toX(p.x), toY(p.y));
     ctx.rotate(p.a);
     ctx.scale(s / KPU, s / KPU);
-    ctx.translate(-game.com.x * KPU, -game.com.y * KPU);
+    ctx.translate(-game.com.x * KPU + pref.off[0], -game.com.y * KPU + pref.off[1]);
     ctx.beginPath();
     pref.outline.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
     ctx.closePath();
     ctx.fillStyle = col; ctx.fill();
     ctx.lineWidth = 2.5 * KPU / s; ctx.strokeStyle = '#1f2440'; ctx.lineJoin = 'round'; ctx.stroke();
     ctx.restore();
+    // 県庁所在地(=重心、回転の中心)の★
+    drawStar(toX(p.x), toY(p.y), Math.max(4, Math.min(9, PrefPhysics.radiusOf(game.body) * s * 0.12)), p.a);
     // 県名ラベル
     ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#1f2440';
@@ -527,6 +527,17 @@
       ctx.fillText(pref.name, toX(p.x), topY - 10);
     }
 
+    function drawStar(x, y, R, rot) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rr = i % 2 ? R * 0.45 : R, t = -Math.PI / 2 + i * Math.PI / 5;
+        i ? ctx.lineTo(Math.cos(t) * rr, Math.sin(t) * rr) : ctx.moveTo(Math.cos(t) * rr, Math.sin(t) * rr);
+      }
+      ctx.closePath(); ctx.fillStyle = '#f2b632'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#1f2440'; ctx.stroke();
+      ctx.restore();
+    }
     function roundRect(x, y, w, h, rr) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); }
   }
 
