@@ -2,10 +2,12 @@
 (function (root) {
   const KM_PER_UNIT = 2;          // 1物理単位 = 2km
   const DENSITY = 0.001;          // 全県共通の密度(質量∝面積)
-  const E_MAX = 48;               // パワー100%時のエネルギー(全県共通)
+  const E_MAX = 48;               // パワー100%時のエネルギー(大阪府の面積が基準)
+  const E_REF_AREA = 1860;        // 基準の面積(km²)
+  const E_AREA_EXP = 0.7;         // 大きい県ほど火薬も増える度合い(0=全県同じ、1=全県同じ初速)
   const GRAVITY_SCALE = 0.001;
   const GROUND_Y = 0;
-  const GROUND_DRAG = 0.01;       // 接地中の抵抗(転がり抵抗の代わり)
+  const GROUND_DRAG = 0.004;      // 接地中の抵抗(転がり抵抗の代わり)
 
   function createGame(Matter, pref) {
     const { Engine, Bodies, Body, Composite } = Matter;
@@ -20,7 +22,7 @@
 
     const parts = pref.parts.map(pts =>
       Bodies.fromVertices(0, 0, [pts.map(([x, y]) => ({ x: x / KM_PER_UNIT, y: y / KM_PER_UNIT }))], {
-        density: DENSITY, friction: 0.6, restitution: 0.35
+        density: DENSITY, friction: 0.9, restitution: 0.5
       }));
     // 各パーツの位置は、元の座標どおりに置き直す
     pref.parts.forEach((pts, i) => {
@@ -31,7 +33,7 @@
       }
       A /= 2; Body.setPosition(parts[i], { x: cx / (6 * A) / KM_PER_UNIT, y: cy / (6 * A) / KM_PER_UNIT });
     });
-    const body = Body.create({ parts, friction: 0.6, restitution: 0.35, frictionAir: 0 });
+    const body = Body.create({ parts, friction: 0.9, restitution: 0.5, frictionAir: 0 });
 
     // 見た目用の輪郭は元データの原点基準なので、重心とのズレを覚えておく
     const com = { x: body.position.x, y: body.position.y };
@@ -46,7 +48,7 @@
 
     state.launch = function (angleDeg, powerPct) {
       Body.setPosition(body, { x: startX, y: startY });
-      const E = E_MAX * Math.max(0.02, powerPct / 100);
+      const E = E_MAX * Math.pow(pref.area / E_REF_AREA, E_AREA_EXP) * Math.max(0.02, powerPct / 100);
       const v = Math.sqrt(2 * E / body.mass);
       const th = angleDeg * Math.PI / 180;
       Body.setVelocity(body, { x: v * Math.cos(th), y: -v * Math.sin(th) });
@@ -75,7 +77,8 @@
       if (state.still > 40 || (state.touched && state.steps - state.touchStep > 900) || state.steps > 60 * 40) state.settled = true;
     };
 
-    state.rawDistanceKm = () => (body.position.x - startX) * KM_PER_UNIT;
+    // 記録は、発射位置から県の一番前の端まで(大きい県ほど有利)
+    state.rawDistanceKm = () => (body.bounds.max.x - startX) * KM_PER_UNIT;
     state.distanceKm = () => Math.max(0, state.rawDistanceKm());
     state.heightKm = () => Math.max(0, (GROUND_Y - body.bounds.max.y) * KM_PER_UNIT);
     return state;

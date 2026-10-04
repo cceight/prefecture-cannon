@@ -87,7 +87,7 @@
 <section id="select" class="screen on">
   <div class="head">
     <h1 class="logo">都道府県キャノン<small>PREFECTURE CANNON</small></h1>
-    <p class="lead">都道府県を、実寸大のまま大砲で撃ち出すわ。大きい県ほど重くて飛ばない、小さい県ほどよく飛ぶ。どの県を、何度で撃つかが勝負よ。</p>
+    <p class="lead">都道府県を、実寸大のまま大砲で撃ち出すわ。小さい県は軽くてよく飛び、大きい県は図体のぶん前に出る。記録は県の一番前の端まで。どの県を、何度で撃つかが勝負よ。</p>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
@@ -146,8 +146,8 @@
 
   // ===== 保存(端末内の自己ベスト) =====
   const store = {
-    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest') || '{}'); } catch { return {}; } },
-    set(v) { try { localStorage.setItem('prefCannonBest', JSON.stringify(v)); } catch {} },
+    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest2') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('prefCannonBest2', JSON.stringify(v)); } catch {} },
   };
   let best = store.get();
 
@@ -280,7 +280,7 @@
     const p = { x: prevPose.x + (cur.x - prevPose.x) * alpha, y: prevPose.y + (cur.y - prevPose.y) * alpha, a: prevPose.a + (cur.a - prevPose.a) * alpha };
 
     if (phase === 'fly' || phase === 'done') {
-      const raw = (p.x - game.startX) * KPU;
+      const raw = (p.x + (game.body.bounds.max.x - cur.x) - game.startX) * KPU;
       $('hudDist').textContent = fmt(Math.max(0, raw));
       const hgt = Math.max(0, -game.body.bounds.max.y * KPU);
       $('hudHeight').textContent = hgt > 1 ? `高さ ${fmt(hgt)} km` : '';
