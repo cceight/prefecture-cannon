@@ -100,7 +100,7 @@
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=7" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=8" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -123,7 +123,7 @@
       <div class="cmp" id="rCmp"></div>
       <div class="btns">
         <button class="btn main" id="againBtn">もう一回撃つ</button>
-        <a class="btn x" id="postBtn" href="https://x.com/intent/tweet" target="_blank" rel="noopener">Xに記録をポスト</a>
+        <a class="btn x" id="postBtn" href="https://x.com/intent/tweet" target="_blank" rel="noopener">Twitterに記録を投稿</a>
         <button class="btn" id="selBtn">県を選びなおす</button>
       </div>
     </div>
@@ -131,8 +131,8 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=7"></script>
-<script src="physics.js?v=7"></script>
+<script src="shapes.js?v=8"></script>
+<script src="physics.js?v=8"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -541,10 +541,12 @@
     setTimeout(() => {
       $('rName').textContent = pref.name + ' の飛距離';
       $('rDist').textContent = fmt(d);
-      $('rSpec').textContent = `角度 ${angle}° ／ パワー ${power}%`;
+      // 初速(km/s): ゲーム内の速さ(物理単位/コマ) × 1単位のkm × 1秒のコマ数
+      const v0 = Math.round(game.v0 * KPU * 60).toLocaleString();
+      $('rSpec').innerHTML = `角度 ${angle}° ／ パワー ${power}%<br>初速 ${v0} km/s`;
       $('rBadge').innerHTML = isNew && d > 0 ? '<span class="nb">自己ベスト更新！</span>' : (prev ? `<div class="cmp">ベストは ${fmt(prev.d)} km</div>` : '');
       $('rCmp').textContent = raw < 0 ? '後ろに転がっちゃったわね…' : (lm ? `だいたい「${lm[1]}」くらいの距離` : 'まだ近所ね');
-      const text = `${pref.name}を 角度${angle}° パワー${power}% で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
+      const text = `${pref.name}を 初速${v0}km/s で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
       const url = location.href.split('#')[0].split('?')[0];
       $('postBtn').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(text) + (url.startsWith('http') ? '&url=' + encodeURIComponent(url) : '');
       $('result').classList.add('on');
