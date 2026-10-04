@@ -8,6 +8,8 @@
   const AIR_DRAG = 0.000008;      // 空気抵抗(進行方向から見た幅 × 速さ² ÷ 重さ で減速)
   const GRAVITY_SCALE = 0.001;
   const GROUND_Y = 0;
+  const MAX_MOVE = 4;             // 1回の計算で動いてよい距離(物理単位)
+  const MAX_SUBSTEPS = 16;        // 1コマを最大何分割するか
   const GROUND_DRAG = 0.004;      // 接地中の抵抗(転がり抵抗の代わり)
 
   function createGame(Matter, pref) {
@@ -58,22 +60,29 @@
       state.v0 = v;
     };
 
-    state.step = function (dt = 1000 / 60) {
-      if (!state.launched || state.settled) return;
+    // 1回分の細かい計算(空気抵抗 → 物理更新)。frac は1フレームに対する割合
+    function subStep(dt, frac) {
       // 空気抵抗: 重い県ほど減速しにくく、細長い県は回転の向きで受ける風が変わる
       if (body.bounds.max.y < GROUND_Y - 0.5) {
-        const v = body.velocity, sp = Math.hypot(v.x, v.y);
+        const v = Body.getVelocity(body), sp = Math.hypot(v.x, v.y);
         if (sp > 0.01) {
           const nx = -v.y / sp, ny = v.x / sp;
           let lo = Infinity, hi = -Infinity;
           for (let i = 1; i < body.parts.length; i++) {
             for (const q of body.parts[i].vertices) { const d = q.x * nx + q.y * ny; if (d < lo) lo = d; if (d > hi) hi = d; }
           }
-          const k = Math.min(0.5, AIR_DRAG * (hi - lo) * sp / body.mass);
+          const k = Math.min(0.5, AIR_DRAG * (hi - lo) * sp / body.mass * frac);
           Body.setVelocity(body, { x: v.x * (1 - k), y: v.y * (1 - k) });
         }
       }
       Engine.update(engine, dt);
+    }
+
+    state.step = function (dt = 1000 / 60) {
+      if (!state.launched || state.settled) return;
+      // 速いときは1コマを細かく刻んで計算する(着地で地面に深くめり込むのを防ぐ)
+      const n = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(Body.getSpeed(body) / MAX_MOVE)));
+      for (let i = 0; i < n; i++) subStep(dt / n, 1 / n);
       state.steps++;
       // 接地中は地面の抵抗(転がり抵抗)をかける
       if (body.bounds.max.y > GROUND_Y - 0.5) {
@@ -85,7 +94,7 @@
         const t = state.steps - state.touchStep;
         body.frictionAir = GROUND_DRAG * (1 + Math.max(0, t - 180) / 60);
       }
-      const sp = body.speed, av = Math.abs(body.angularVelocity);
+      const sp = Body.getSpeed(body), av = Math.abs(Body.getAngularVelocity(body));
       state.peakY = Math.min(state.peakY, body.bounds.max.y);
       if (state.steps > 30 && sp < 0.03 && av < 0.0008) state.still++; else state.still = 0;
       if (state.still > 40 || (state.touched && state.steps - state.touchStep > 900) || state.steps > 60 * 40) state.settled = true;

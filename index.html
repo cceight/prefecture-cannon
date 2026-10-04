@@ -100,7 +100,7 @@
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=6" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -131,8 +131,8 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js"></script>
-<script src="physics.js"></script>
+<script src="shapes.js?v=6"></script>
+<script src="physics.js?v=6"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -360,7 +360,7 @@
     if (phase === 'fly') {
       accum += dt * PLAY_SPEED;
       while (accum >= STEP && !game.settled) {
-        const vyBefore = game.body.velocity.y;
+        const vyBefore = Matter.Body.getVelocity(game.body).y;
         prevPose = pose(); game.step(STEP); accum -= STEP;
         const onGround = game.body.bounds.max.y > -0.5;
         if (airborne && onGround && vyBefore > 0.8 && ts - lastThud > 150) { sound.land(vyBefore / 12); shake = Math.max(shake, Math.min(1, vyBefore / 10)); lastThud = ts; }
