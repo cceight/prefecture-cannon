@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>都道府県キャノン</title>
+<meta name="description" content="都道府県を実寸大で大砲から撃ち出して、飛距離を競う物理演算ゲーム。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f6efe0;
+    --ink: #1f2440;
+    --red: #d6382f;
+    --indigo: #263a7a;
+    --gold: #f2b632;
+    --muted: #7b7666;
+    --card: #fffaf0;
+    --line: #d9cfb8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); overflow: hidden;
+    font-family: "M PLUS Rounded 1c", system-ui, sans-serif; font-weight: 500; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .screen { position: fixed; inset: 0; display: none; }
+  .screen.on { display: block; }
+
+  /* 選択画面 */
+  #select { overflow-y: auto; padding: 20px 16px 40px; }
+  .head { max-width: 980px; margin: 0 auto 18px; display: flex; align-items: end; gap: 16px; flex-wrap: wrap; }
+  .logo { font-family: "Dela Gothic One", sans-serif; font-size: clamp(30px, 7vw, 54px); line-height: 1; margin: 0;
+    color: var(--red); text-shadow: 3px 3px 0 var(--ink); letter-spacing: .02em; }
+  .logo small { display: block; font-size: .32em; color: var(--ink); text-shadow: none; letter-spacing: .3em; margin-top: 8px; }
+  .lead { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; flex: 1; min-width: 220px; }
+  .tabs { max-width: 980px; margin: 0 auto 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button { border: 2px solid var(--ink); background: var(--card); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+  .tabs button.on { background: var(--ink); color: var(--paper); }
+  .grid { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  .pref { background: var(--card); border: 2px solid var(--ink); border-radius: 12px; padding: 8px 6px 7px; text-align: center;
+    box-shadow: 3px 3px 0 var(--ink); transition: transform .08s, box-shadow .08s; }
+  .pref:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .pref svg { width: 100%; height: 62px; display: block; }
+  .pref .n { font-weight: 800; font-size: 14px; margin-top: 4px; }
+  .pref .a { font-size: 11px; color: var(--muted); }
+  .pref .b { font-size: 11px; color: var(--red); font-weight: 800; min-height: 1.3em; }
+
+  /* プレイ画面 */
+  #play canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .hud { position: absolute; left: 0; right: 0; top: 0; padding: 12px 16px; display: flex; justify-content: space-between; align-items: start; pointer-events: none; }
+  .hud .who { font-family: "Dela Gothic One", sans-serif; font-size: 22px; }
+  .hud .who small { display: block; font-family: "M PLUS Rounded 1c"; font-size: 12px; color: var(--muted); }
+  .hud .dist { text-align: right; font-family: "Dela Gothic One", sans-serif; font-size: clamp(28px, 7vw, 48px); line-height: 1; }
+  .hud .dist small { font-size: .4em; margin-left: 4px; }
+  .hud .dist .h { display: block; font-family: "M PLUS Rounded 1c"; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .back { position: absolute; left: 16px; bottom: 16px; border: 2px solid var(--ink); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+  .gauges { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); pointer-events: none; }
+  .gauge { margin-top: 8px; }
+  .gauge .lbl { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; margin-bottom: 3px; }
+  .gauge .bar { height: 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); overflow: hidden; }
+  .gauge .fill { height: 100%; width: 0; background: var(--indigo); }
+  .gauge.pow .fill { background: linear-gradient(90deg, var(--gold), var(--red)); }
+  .gauge.dim { opacity: .35; }
+  .gauge.done .bar { border-color: var(--red); }
+  .tap { text-align: center; font-weight: 800; font-size: 14px; margin-bottom: 4px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  /* 結果 */
+  .result { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(31,36,64,.35); padding: 16px; }
+  .result.on { display: flex; }
+  .card { background: var(--card); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 6px 6px 0 var(--ink); padding: 22px 20px 18px;
+    width: min(380px, 100%); text-align: center; }
+  .card .t { font-size: 13px; color: var(--muted); }
+  .card .big { font-family: "Dela Gothic One", sans-serif; font-size: 46px; line-height: 1.1; margin: 6px 0; color: var(--red); }
+  .card .big small { font-size: .4em; color: var(--ink); margin-left: 4px; }
+  .card .spec { font-size: 13px; }
+  .card .nb { display: inline-block; margin-top: 8px; background: var(--gold); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 12px; font-weight: 800; font-size: 13px; }
+  .card .cmp { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .btns { display: grid; gap: 8px; margin-top: 16px; }
+  .btn { display: block; text-decoration: none; border: 2px solid var(--ink); border-radius: 12px; padding: 10px; font-weight: 800; background: var(--card); box-shadow: 3px 3px 0 var(--ink); }
+  .btn.main { background: var(--red); color: #fff; }
+  .btn.x { background: var(--ink); color: var(--paper); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+</style>
+</head>
+<body>
+
+<section id="select" class="screen on">
+  <div class="head">
+    <h1 class="logo">都道府県キャノン<small>PREFECTURE CANNON</small></h1>
+    <p class="lead">都道府県を、実寸大のまま大砲で撃ち出すわ。大きい県ほど重くて飛ばない、小さい県ほどよく飛ぶ。どの県を、何度で撃つかが勝負よ。</p>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="play" class="screen">
+  <canvas id="cv"></canvas>
+  <div class="hud">
+    <div class="who"><span id="hudName"></span><small id="hudInfo"></small></div>
+    <div class="dist"><span id="hudDist">0</span><small>km</small><span class="h" id="hudHeight"></span></div>
+  </div>
+  <div class="gauges" id="gauges">
+    <div class="tap" id="tapMsg">タップで角度を止めて</div>
+    <div class="gauge ang" id="gAng"><div class="lbl"><span>角度</span><span id="vAng">0°</span></div><div class="bar"><div class="fill" id="fAng"></div></div></div>
+    <div class="gauge pow dim" id="gPow"><div class="lbl"><span>パワー</span><span id="vPow">0%</span></div><div class="bar"><div class="fill" id="fPow"></div></div></div>
+  </div>
+  <button class="back" id="backBtn">← 県を選ぶ</button>
+  <div class="result" id="result">
+    <div class="card">
+      <div class="t" id="rName"></div>
+      <div class="big"><span id="rDist"></span><small>km</small></div>
+      <div class="spec" id="rSpec"></div>
+      <div id="rBadge"></div>
+      <div class="cmp" id="rCmp"></div>
+      <div class="btns">
+        <button class="btn main" id="againBtn">もう一回撃つ</button>
+        <a class="btn x" id="postBtn" href="https://x.com/intent/tweet" target="_blank" rel="noopener">Xに記録をポスト</a>
+        <button class="btn" id="selBtn">県を選びなおす</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script src="shapes.js"></script>
+<script src="physics.js"></script>
+<script>
+(() => {
+  const SHAPES = window.PREF_SHAPES;
+  const KPU = PrefPhysics.KM_PER_UNIT;
+  const REGIONS = [
+    { name: '北海道・東北', ids: [1, 7], color: '#5b8fd6' },
+    { name: '関東', ids: [8, 14], color: '#e0663f' },
+    { name: '中部', ids: [15, 23], color: '#4fa772' },
+    { name: '近畿', ids: [24, 30], color: '#c9549b' },
+    { name: '中国', ids: [31, 35], color: '#d9a52b' },
+    { name: '四国', ids: [36, 39], color: '#3fa8a8' },
+    { name: '九州・沖縄', ids: [40, 47], color: '#8a62c9' },
+  ];
+  const regionOf = id => REGIONS.find(r => id >= r.ids[0] && id <= r.ids[1]);
+  // 飛距離の目安になる、だいたいの直線距離(km)
+  const LANDMARKS = [
+    [8, '東京→横浜'], [50, '東京→八王子'], [100, '東京→宇都宮'], [400, '東京→大阪'], [500, '東京→京都・大阪あたり'],
+    [830, '東京→札幌'], [880, '東京→福岡'], [1550, '東京→那覇'], [1900, '稚内→鹿児島'], [3000, '日本列島の端から端'],
+  ];
+
+  // ===== 保存(端末内の自己ベスト) =====
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('prefCannonBest', JSON.stringify(v)); } catch {} },
+  };
+  let best = store.get();
+
+  // ===== 選択画面 =====
+  const $ = id => document.getElementById(id);
+  let filter = 0;
+  function silhouette(p, color) {
+    const xs = p.outline.map(v => v[0]), ys = p.outline.map(v => v[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const pad = Math.max(maxX - minX, maxY - minY) * 0.06;
+    const d = 'M' + p.outline.map(v => v[0] + ' ' + v[1]).join('L') + 'Z';
+    return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="${color}" stroke="#1f2440" stroke-width="${(maxX - minX) / 40}" stroke-linejoin="round"/></svg>`;
+  }
+  function renderTabs() {
+    const names = ['すべて', ...REGIONS.map(r => r.name)];
+    $('tabs').innerHTML = names.map((n, i) => `<button class="${i === filter ? 'on' : ''}" data-i="${i}">${n}</button>`).join('');
+  }
+  function renderGrid() {
+    const list = SHAPES.filter(p => filter === 0 || regionOf(p.id) === REGIONS[filter - 1]);
+    $('grid').innerHTML = list.map(p => `
+      <button class="pref" data-id="${p.id}">
+        ${silhouette(p, regionOf(p.id).color)}
+        <div class="n">${p.name}</div>
+        <div class="a">${p.area.toLocaleString()} km²</div>
+        <div class="b">${best[p.id] ? 'ベスト ' + fmt(best[p.id].d) + 'km' : ''}</div>
+      </button>`).join('');
+  }
+  $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; filter = +b.dataset.i; renderTabs(); renderGrid(); });
+  $('grid').addEventListener('click', e => { const b = e.target.closest('.pref'); if (b) startGame(+b.dataset.id); });
+  const fmt = v => v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1);
+
+  // ===== プレイ画面 =====
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+  }
+  window.addEventListener('resize', resize);
+
+  let pref, game, phase, angle, power, gaugeT, cam, prevPose, accum, trail, lastTs, settledAt;
+  const PLAY_SPEED = 0.7;         // 再生速度(スロー気味)
+  const STEP = 1000 / 60;
+
+  function startGame(id) {
+    pref = SHAPES.find(p => p.id === id);
+    game = PrefPhysics.createGame(Matter, pref);
+    phase = 'angle'; angle = 0; power = 0; gaugeT = 0; accum = 0; trail = []; settledAt = 0;
+    const r = PrefPhysics.radiusOf(game.body);
+    cam = { x: game.body.position.x + r * 1.2, y: game.startY, scale: 0 };
+    cam.scale = targetScale();
+    prevPose = pose();
+    $('select').classList.remove('on'); $('play').classList.add('on');
+    $('result').classList.remove('on');
+    $('hudName').textContent = pref.name;
+    $('hudInfo').textContent = `面積 ${pref.area.toLocaleString()} km²` + (best[id] ? ` ／ ベスト ${fmt(best[id].d)} km` : '');
+    $('hudDist').textContent = '0'; $('hudHeight').textContent = '';
+    $('gauges').style.display = ''; $('tapMsg').textContent = 'タップで角度を止めて';
+    $('gAng').className = 'gauge ang'; $('gPow').className = 'gauge pow dim';
+    resize();
+    lastTs = performance.now();
+  }
+
+  function pose() { const b = game.body; return { x: b.position.x, y: b.position.y, a: b.angle }; }
+
+  function onTap() {
+    if (phase === 'angle') {
+      phase = 'power'; gaugeT = 0;
+      $('gAng').className = 'gauge ang done'; $('gPow').className = 'gauge pow';
+      $('tapMsg').textContent = 'タップでパワーを止めて、発射！';
+    } else if (phase === 'power') {
+      phase = 'fly';
+      $('gPow').className = 'gauge pow done';
+      $('tapMsg').textContent = '';
+      game.launch(angle, power);
+      prevPose = pose();
+      shake = 1;
+    }
+  }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); onTap(); });
+  window.addEventListener('keydown', e => {
+    if (!$('play').classList.contains('on')) return;
+    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if ($('result').classList.contains('on')) again(); else onTap(); }
+  });
+  $('backBtn').addEventListener('click', toSelect);
+  $('selBtn').addEventListener('click', toSelect);
+  $('againBtn').addEventListener('click', again);
+  function again() { startGame(pref.id); }
+  function toSelect() { $('play').classList.remove('on'); $('select').classList.add('on'); renderGrid(); }
+
+  // ゲージ: 三角波で往復
+  const tri = (t, period) => { const x = (t / period) % 1; return x < 0.5 ? x * 2 : 2 - x * 2; };
+
+  // カメラ: 県の大きさと高さが収まるように
+  function targetScale() {
+    const r = PrefPhysics.radiusOf(game.body);
+    const h = Math.max(0, -game.body.bounds.min.y);
+    const worldH = Math.max(r * 7, h * 1.3 + r * 2.5) / 0.78;
+    const worldW = r * 9;
+    return Math.min(H / worldH, W / worldW);
+  }
+
+  let shake = 0;
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (!$('play').classList.contains('on') || !game) return;
+    const dt = Math.min(50, ts - lastTs); lastTs = ts;
+
+    if (phase === 'angle') { gaugeT += dt; angle = Math.round(tri(gaugeT, 2200) * 90); }
+    if (phase === 'power') { gaugeT += dt; power = Math.max(1, Math.round(tri(gaugeT, 1300) * 100)); }
+
+    let alpha = 1;
+    if (phase === 'fly') {
+      accum += dt * PLAY_SPEED;
+      while (accum >= STEP && !game.settled) {
+        prevPose = pose(); game.step(STEP); accum -= STEP;
+        if (game.steps % 3 === 0) trail.push({ x: game.body.position.x, y: game.body.position.y });
+      }
+      alpha = game.settled ? 1 : accum / STEP;
+      if (game.settled && !settledAt) { settledAt = ts; finish(); }
+    }
+    $('fAng').style.width = (angle / 90 * 100) + '%'; $('vAng').textContent = angle + '°';
+    $('fPow').style.width = power + '%'; $('vPow').textContent = power + '%';
+
+    const cur = pose();
+    const p = { x: prevPose.x + (cur.x - prevPose.x) * alpha, y: prevPose.y + (cur.y - prevPose.y) * alpha, a: prevPose.a + (cur.a - prevPose.a) * alpha };
+
+    if (phase === 'fly' || phase === 'done') {
+      const raw = (p.x - game.startX) * KPU;
+      $('hudDist').textContent = fmt(Math.max(0, raw));
+      const hgt = Math.max(0, -game.body.bounds.max.y * KPU);
+      $('hudHeight').textContent = hgt > 1 ? `高さ ${fmt(hgt)} km` : '';
+      // カメラ追従
+      const r = PrefPhysics.radiusOf(game.body);
+      const k = 1 - Math.pow(0.04, dt / 1000);
+      cam.x += (p.x + r * 1.2 - cam.x) * k * 2.5;
+      cam.scale += (targetScale() - cam.scale) * k;
+    }
+    draw(p);
+    shake *= 0.9;
+  }
+
+  function draw(p) {
+    const s = cam.scale;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 空
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#9fc9ea'); sky.addColorStop(1, '#eaf3f6');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    const groundPx = H * 0.80;
+    const sx = (shake * 6) * (Math.random() - 0.5), sy = (shake * 6) * (Math.random() - 0.5);
+    const toX = x => (x - cam.x) * s + W * 0.5 + sx;
+    const toY = y => (y - PrefPhysics.GROUND_Y) * s + groundPx + sy;
+
+    // 遠景の雲(パララックス)
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    for (let i = 0; i < 6; i++) {
+      const cx = ((i * 337 - cam.x * s * 0.15) % (W + 300) + W + 300) % (W + 300) - 150;
+      const cy = H * (0.12 + (i % 3) * 0.12);
+      ctx.beginPath(); ctx.ellipse(cx, cy, 60, 16, 0, 0, Math.PI * 2); ctx.ellipse(cx + 40, cy - 8, 40, 14, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 地面
+    ctx.fillStyle = '#7fb069'; ctx.fillRect(0, toY(0), W, H);
+    ctx.fillStyle = '#5e8f4e'; ctx.fillRect(0, toY(0), W, 4);
+    // 距離の目盛り
+    const kmPerPx = KPU / s;
+    const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000];
+    const tick = steps.find(v => v / kmPerPx > 90) || 5000;
+    const leftKm = (cam.x - W * 0.5 / s - game.startX) * KPU, rightKm = (cam.x + W * 0.5 / s - game.startX) * KPU;
+    ctx.font = '800 12px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
+    for (let km = Math.ceil(leftKm / tick) * tick; km <= rightKm; km += tick) {
+      if (km < 0) continue;
+      const x = toX(game.startX + km / KPU);
+      ctx.fillStyle = '#1f2440'; ctx.fillRect(x - 1, toY(0), 2, 10);
+      ctx.fillText((km || 0).toLocaleString() + 'km', x, toY(0) + 26);
+    }
+    // 自己ベストの旗
+    const bst = best[pref.id];
+    if (bst) {
+      const x = toX(game.startX + bst.d / KPU), y = toY(0);
+      ctx.strokeStyle = '#1f2440'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 46); ctx.stroke();
+      ctx.fillStyle = '#d6382f'; ctx.beginPath(); ctx.moveTo(x, y - 46); ctx.lineTo(x + 26, y - 39); ctx.lineTo(x, y - 32); ctx.fill();
+      ctx.fillStyle = '#1f2440'; ctx.fillText('BEST', x, y - 52);
+    }
+
+    // 軌跡
+    ctx.fillStyle = 'rgba(31,36,64,.35)';
+    for (const t of trail) { ctx.beginPath(); ctx.arc(toX(t.x), toY(t.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
+
+    // 大砲(県の大きさに合わせて巨大化)
+    const r = PrefPhysics.radiusOf(game.body);
+    const baseX = game.startX - r * 1.15, baseY = 0;
+    const th = -angle * Math.PI / 180;
+    ctx.save();
+    ctx.translate(toX(baseX), toY(baseY - r * 0.55));
+    ctx.rotate(th);
+    ctx.fillStyle = '#2b2f45'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2;
+    roundRect(-r * 0.3 * s, -r * 0.42 * s, r * 2.1 * s, r * 0.84 * s, r * 0.2 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d6382f'; ctx.fillRect(r * 1.55 * s, -r * 0.46 * s, r * 0.25 * s, r * 0.92 * s);
+    ctx.restore();
+    ctx.fillStyle = '#8a5a34'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(toX(baseX), toY(baseY - r * 0.55), r * 0.55 * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5c3a20'; ctx.beginPath(); ctx.arc(toX(baseX), toY(baseY - r * 0.55), r * 0.18 * s, 0, Math.PI * 2); ctx.fill();
+
+    // 狙いの角度ライン
+    if (phase === 'angle' || phase === 'power') {
+      const L = r * 4.5;
+      ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(214,56,47,.8)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(toX(p.x), toY(p.y));
+      ctx.lineTo(toX(p.x + Math.cos(-th) * L), toY(p.y - Math.sin(-th) * L)); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // 県
+    const col = regionOf(pref.id).color;
+    ctx.save();
+    ctx.translate(toX(p.x), toY(p.y));
+    ctx.rotate(p.a);
+    ctx.scale(s / KPU, s / KPU);
+    ctx.translate(-game.com.x * KPU, -game.com.y * KPU);
+    ctx.beginPath();
+    pref.outline.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
+    ctx.closePath();
+    ctx.fillStyle = col; ctx.fill();
+    ctx.lineWidth = 2.5 * KPU / s; ctx.strokeStyle = '#1f2440'; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.restore();
+    // 県名ラベル
+    ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#1f2440';
+    ctx.fillText(pref.name, toX(p.x), toY(game.body.bounds.min.y) - 10);
+
+    function roundRect(x, y, w, h, rr) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); }
+  }
+
+  function finish() {
+    phase = 'done';
+    $('gauges').style.display = 'none';
+    const raw = game.rawDistanceKm(), d = Math.max(0, raw);
+    const prev = best[pref.id];
+    const isNew = !prev || d > prev.d;
+    if (isNew && d > 0) { best[pref.id] = { d, a: angle, p: power }; store.set(best); }
+    const lm = LANDMARKS.filter(l => l[0] <= d).pop();
+    setTimeout(() => {
+      $('rName').textContent = pref.name + ' の飛距離';
+      $('rDist').textContent = fmt(d);
+      $('rSpec').textContent = `角度 ${angle}° ／ パワー ${power}%`;
+      $('rBadge').innerHTML = isNew && d > 0 ? '<span class="nb">自己ベスト更新！</span>' : (prev ? `<div class="cmp">ベストは ${fmt(prev.d)} km</div>` : '');
+      $('rCmp').textContent = raw < 0 ? '後ろに転がっちゃったわね…' : (lm ? `だいたい「${lm[1]}」くらいの距離` : 'まだ近所ね');
+      const text = `${pref.name}を 角度${angle}° パワー${power}% で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
+      const url = location.href.split('#')[0].split('?')[0];
+      $('postBtn').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(text) + (url.startsWith('http') ? '&url=' + encodeURIComponent(url) : '');
+      $('result').classList.add('on');
+    }, 700);
+  }
+
+  renderTabs(); renderGrid(); resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
