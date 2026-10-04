@@ -137,6 +137,11 @@
     { name: '四国', ids: [36, 39], color: '#3fa8a8' },
     { name: '九州・沖縄', ids: [40, 47], color: '#8a62c9' },
   ];
+  // カメラの基準: 一番大きい県(北海道)の半径。どの県でも地上の縮尺はこれで固定
+  const REF_R = Math.max(...SHAPES.map(p => {
+    const xs = p.outline.map(v => v[0]), ys = p.outline.map(v => v[1]);
+    return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2 / PrefPhysics.KM_PER_UNIT;
+  }));
   const regionOf = id => REGIONS.find(r => id >= r.ids[0] && id <= r.ids[1]);
   // 飛距離の目安になる、だいたいの直線距離(km)
   const LANDMARKS = [
@@ -202,8 +207,8 @@
     phase = 'angle'; angle = 0; power = 0; gaugeT = 0; accum = 0; trail = []; settledAt = 0;
     $('select').classList.remove('on'); $('play').classList.add('on');
     resize();
-    const r = PrefPhysics.radiusOf(game.body);
-    cam = { x: game.body.position.x + r * 1.2, y: game.startY, scale: targetScale() };
+    cam = { x: 0, y: game.startY, scale: targetScale() };
+    cam.x = game.body.position.x + camLead(cam.scale);
     prevPose = pose();
     $('result').classList.remove('on');
     $('hudName').textContent = pref.name;
@@ -245,16 +250,19 @@
   const tri = (t, period) => { const x = (t / period) % 1; return x < 0.5 ? x * 2 : 2 - x * 2; };
 
   // カメラ: 県の大きさと高さが収まるように
+  // 地上では全県共通の縮尺(北海道が画面幅の半分弱)。高く飛んだ時だけ引く
   function targetScale() {
-    const r = PrefPhysics.radiusOf(game.body);
     const h = Math.max(0, -game.body.bounds.min.y);
-    const worldH = Math.max(r * 7, h * 1.3 + r * 2.5) / 0.78;
-    const worldW = r * 9;
+    const worldH = Math.max(REF_R * 3.5, h * 1.25 + REF_R * 1.2) / 0.78;
+    const worldW = REF_R * 4.6;
     const sc = Math.min(H / worldH, W / worldW);
     return sc > 0 && isFinite(sc) ? sc : (cam && cam.scale > 0 ? cam.scale : 1);
   }
 
   let shake = 0;
+  // 県を画面の左寄り(左から35%)に置くための、カメラの先回り量
+  const camLead = sc => W * 0.15 / sc;
+
   function frame(ts) {
     requestAnimationFrame(frame);
     if (!$('play').classList.contains('on') || !game) return;
@@ -285,9 +293,8 @@
       const hgt = Math.max(0, -game.body.bounds.max.y * KPU);
       $('hudHeight').textContent = hgt > 1 ? `高さ ${fmt(hgt)} km` : '';
       // カメラ追従
-      const r = PrefPhysics.radiusOf(game.body);
       const k = 1 - Math.pow(0.04, dt / 1000);
-      cam.x += (p.x + r * 1.2 - cam.x) * k * 2.5;
+      cam.x += (p.x + camLead(cam.scale) - cam.x) * k * 2.5;
       cam.scale += (targetScale() - cam.scale) * k;
     }
     draw(p);
@@ -383,7 +390,17 @@
     // 県名ラベル
     ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
     ctx.fillStyle = '#1f2440';
-    ctx.fillText(pref.name, toX(p.x), toY(game.body.bounds.min.y) - 10);
+    const topY = toY(game.body.bounds.min.y);
+    const small = PrefPhysics.radiusOf(game.body) * s < 40;
+    if (small) {
+      // 小さい県は見失いやすいので、目印のピンを立てる
+      ctx.fillStyle = '#d6382f';
+      ctx.beginPath(); ctx.moveTo(toX(p.x), topY - 6); ctx.lineTo(toX(p.x) - 8, topY - 20); ctx.lineTo(toX(p.x) + 8, topY - 20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1f2440';
+      ctx.fillText(pref.name, toX(p.x), topY - 26);
+    } else {
+      ctx.fillText(pref.name, toX(p.x), topY - 10);
+    }
 
     function roundRect(x, y, w, h, rr) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); }
   }
