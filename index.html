@@ -31,6 +31,13 @@
   .logo { font-family: "Dela Gothic One", sans-serif; font-size: clamp(30px, 7vw, 54px); line-height: 1; margin: 0;
     color: var(--red); text-shadow: 3px 3px 0 var(--ink); letter-spacing: .02em; }
   .logo small { display: block; font-size: .32em; color: var(--ink); text-shadow: none; letter-spacing: .3em; margin-top: 8px; }
+  .modes { max-width: 980px; margin: 0 auto 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; box-shadow: 3px 3px 0 var(--ink); }
+  .seg button { border: 0; background: var(--card); padding: 6px 14px; font-weight: 800; font-size: 13px; }
+  .seg button + button { border-left: 2px solid var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .seg button.earth[aria-pressed="true"] { background: #10183a; color: #9fd0ff; }
+  .mode-note { font-size: 12px; color: var(--muted); flex: 1; min-width: 200px; }
   .tabs { max-width: 980px; margin: 0 auto 12px; display: flex; gap: 6px; flex-wrap: wrap; }
   .tabs button { border: 2px solid var(--ink); background: var(--card); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
   .tabs button.on { background: var(--ink); color: var(--paper); }
@@ -42,6 +49,8 @@
   .pref .n { font-weight: 800; font-size: 14px; margin-top: 4px; }
   .pref .a { font-size: 11px; color: var(--muted); }
   .pref .b { font-size: 11px; color: var(--red); font-weight: 800; min-height: 1.3em; }
+  .pref.true { background: linear-gradient(180deg, #fffaf0, #ffe9b8); border-color: var(--red); box-shadow: 3px 3px 0 var(--red); }
+  .pref.true .n { color: var(--red); }
 
   /* プレイ画面 */
   #play canvas { display: block; width: 100%; height: 100%; touch-action: none; }
@@ -68,6 +77,10 @@
   .mute[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .credit { max-width: 980px; margin: 22px auto 0; font-size: 11px; color: var(--muted); padding-bottom: 48px; }
 
+  /* 地球モード: 宇宙では文字を明るく */
+  #play.space .hud, #play.space .gauge .lbl, #play.space .tap { color: #e8f0ff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  #play.space .hud .who small, #play.space .hud .dist .h { color: #b9c6e4; }
+
   /* 結果 */
   .result { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(31,36,64,.35); padding: 16px; }
   .result.on { display: flex; }
@@ -76,6 +89,8 @@
   .card .t { font-size: 13px; color: var(--muted); }
   .card .big { font-family: "Dela Gothic One", sans-serif; font-size: 46px; line-height: 1.1; margin: 6px 0; color: var(--red); }
   .card .big small { font-size: .4em; color: var(--ink); margin-left: 4px; }
+  .card .big.msg { font-size: 24px; line-height: 1.35; margin: 10px 0; }
+  .card .lead-isl { font-size: 13px; margin-top: 6px; }
   .card .spec { font-size: 13px; }
   .card .nb { display: inline-block; margin-top: 8px; background: var(--gold); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 12px; font-weight: 800; font-size: 13px; }
   .card .cmp { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
@@ -92,13 +107,20 @@
   <div class="head">
     <h1 class="logo">都道府県キャノン<small>PREFECTURE CANNON</small></h1>
   </div>
+  <div class="modes">
+    <div class="seg" role="group" aria-label="モード">
+      <button id="modeFlat" aria-pressed="true">通常モード</button>
+      <button id="modeEarth" class="earth" aria-pressed="false">地球モード</button>
+    </div>
+    <div class="mode-note" id="modeNote"></div>
+  </div>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
-  <p class="credit">BGM「ひとりぼっちの宇宙紀行」／ 地図データ: dataofjapan/land(国土数値情報ベース)、琵琶湖: Natural Earth</p>
+  <p class="credit">BGM「ひとりぼっちの宇宙紀行」／ 地図データ: dataofjapan/land(国土数値情報ベース)、琵琶湖: Natural Earth<br>地球モード: 半径6,371kmの丸い地球、地表で9.8m/s²の重力、上空ほど薄くなる大気。画面は約452倍速のタイムラプス。</p>
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=11" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=12" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -115,7 +137,8 @@
   <div class="result" id="result">
     <div class="card">
       <div class="t" id="rName"></div>
-      <div class="big"><span id="rDist"></span><small>km</small></div>
+      <div class="big" id="rBig"><span id="rDist"></span><small id="rUnit">km</small></div>
+      <div class="lead-isl" id="rIsland"></div>
       <div class="spec" id="rSpec"></div>
       <div id="rBadge"></div>
       <div class="cmp" id="rCmp"></div>
@@ -129,12 +152,13 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=11"></script>
-<script src="physics.js?v=11"></script>
-<script src="landmarks.js?v=11"></script>
+<script src="shapes.js?v=12"></script>
+<script src="physics.js?v=12"></script>
+<script src="landmarks.js?v=12"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
+  const TRUE_PREFS = window.PREF_TRUE || [];
   const KPU = PrefPhysics.KM_PER_UNIT;
   const REGIONS = [
     { name: '北海道・東北', ids: [1, 7], color: '#5b8fd6' },
@@ -150,9 +174,11 @@
     const xs = p.outline.map(v => v[0]), ys = p.outline.map(v => v[1]);
     return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2 / PrefPhysics.KM_PER_UNIT;
   }));
+  const baseIdOf = p => p.baseId || p.id;
   const regionOf = id => REGIONS.find(r => id >= r.ids[0] && id <= r.ids[1]);
+  const getPref = id => SHAPES.find(p => p.id === id) || TRUE_PREFS.find(p => p.id === id);
   // 飛距離の目安: 飛ばした県の県庁所在地から、記録に近い距離(±6%)にある場所をランダムに1つ選ぶ
-  const EARTH_R = 6371;
+  const EARTH_R = 6371, EARTH_CIRC = 2 * Math.PI * EARTH_R;
   function greatCircleKm(lat1, lon1, lat2, lon2) {
     const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
@@ -167,40 +193,81 @@
     return { home, place: c.where ? `${c.name}（${c.where}）` : c.name };
   }
 
-  // ===== 保存(端末内の自己ベスト) =====
-  const store = {
-    get() { try { return JSON.parse(localStorage.getItem('prefCannonBest3') || '{}'); } catch { return {}; } },
-    set(v) { try { localStorage.setItem('prefCannonBest3', JSON.stringify(v)); } catch {} },
-  };
-  let best = store.get();
+  // ===== 保存(端末内): 自己ベストはモードごと、解禁状況、選んだモード =====
+  const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  let bests = load('prefCannonBest4', null);
+  if (!bests) bests = { flat: load('prefCannonBest3', {}), earth: {} };
+  const saveBests = () => save('prefCannonBest4', bests);
+  let unlocked = load('prefCannonUnlock', {});
+  let mode = load('prefCannonMode', 'flat') === 'earth' ? 'earth' : 'flat';
+  const bestOf = id => bests[mode][id];
 
   // ===== 選択画面 =====
   const $ = id => document.getElementById(id);
   let filter = 0;
   function silhouette(p, color) {
-    const xs = p.outline.map(v => v[0]), ys = p.outline.map(v => v[1]);
+    const rings = p.islands ? p.islands.map(i => i.outline) : [p.outline, ...(p.holes || [])];
+    const all = rings.flat();
+    const xs = all.map(v => v[0]), ys = all.map(v => v[1]);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-    const pad = Math.max(maxX - minX, maxY - minY) * 0.06;
-    const d = [p.outline, ...(p.holes || [])].map(r => 'M' + r.map(v => v[0] + ' ' + v[1]).join('L') + 'Z').join('');
-    return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="${color}" fill-rule="evenodd" stroke="#1f2440" stroke-width="${(maxX - minX) / 40}" stroke-linejoin="round"/></svg>`;
+    const span = Math.max(maxX - minX, maxY - minY), pad = span * 0.06;
+    const d = rings.map(r => 'M' + r.map(v => v[0] + ' ' + v[1]).join('L') + 'Z').join('');
+    return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="${color}" fill-rule="evenodd" stroke="#1f2440" stroke-width="${span / (p.islands ? 90 : 40)}" stroke-linejoin="round"/></svg>`;
   }
   function renderTabs() {
     const names = ['すべて', ...REGIONS.map(r => r.name)];
     $('tabs').innerHTML = names.map((n, i) => `<button class="${i === filter ? 'on' : ''}" data-i="${i}">${n}</button>`).join('');
   }
+  function bestLabel(id) {
+    const b = bestOf(id);
+    if (!b) return '';
+    const tags = [];
+    if (b.d) tags.push('ベスト ' + fmt(b.d) + 'km');
+    if (b.sat) tags.push('衛星');
+    if (b.esc) tags.push('宇宙');
+    return tags.join(' ・ ');
+  }
+  function card(p) {
+    return `
+      <button class="pref${p.islands ? ' true' : ''}" data-id="${p.id}">
+        ${silhouette(p, regionOf(baseIdOf(p)).color)}
+        <div class="n">${p.name}</div>
+        <div class="a">${p.islands ? p.islands.length + '島 ・ ' : ''}${p.area.toLocaleString()} km²</div>
+        <div class="b">${bestLabel(p.id)}</div>
+      </button>`;
+  }
   function renderGrid() {
     const list = SHAPES.filter(p => filter === 0 || regionOf(p.id) === REGIONS[filter - 1]);
-    $('grid').innerHTML = list.map(p => `
-      <button class="pref" data-id="${p.id}">
-        ${silhouette(p, regionOf(p.id).color)}
-        <div class="n">${p.name}</div>
-        <div class="a">${p.area.toLocaleString()} km²</div>
-        <div class="b">${best[p.id] ? 'ベスト ' + fmt(best[p.id].d) + 'km' : ''}</div>
-      </button>`).join('');
+    let html = '';
+    for (const p of list) {
+      html += card(p);
+      const t = TRUE_PREFS.find(x => x.baseId === p.id);
+      if (t && unlocked[p.id]) html += card(t);
+    }
+    $('grid').innerHTML = html;
   }
+  function renderMode() {
+    $('modeFlat').setAttribute('aria-pressed', mode === 'flat');
+    $('modeEarth').setAttribute('aria-pressed', mode === 'earth');
+    $('modeNote').textContent = mode === 'earth'
+      ? '丸い地球、本物の重力と大気。重力を振り切れば宇宙へ、一度も地面に触れずに1周すれば衛星に。'
+      : '平らな大地に撃ち出して、飛距離を競うわ。';
+  }
+  function setMode(m) { mode = m; save('prefCannonMode', m); renderMode(); renderGrid(); }
+  $('modeFlat').addEventListener('click', () => setMode('flat'));
+  $('modeEarth').addEventListener('click', () => setMode('earth'));
   $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; filter = +b.dataset.i; renderTabs(); renderGrid(); });
   $('grid').addEventListener('click', e => { const b = e.target.closest('.pref'); if (b) startGame(+b.dataset.id); });
   const fmt = v => v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1);
+  // 現実の秒数を「○時間○分」に
+  function fmtDuration(sec) {
+    const m = Math.round(sec / 60);
+    if (m < 60) return `${m}分`;
+    const h = Math.floor(m / 60);
+    if (h < 48) return `${h}時間${m % 60}分`;
+    return `${Math.floor(h / 24)}日${h % 24}時間`;
+  }
 
   // ===== 音(BGMはファイル、効果音はその場で合成) =====
   const sound = (() => {
@@ -317,29 +384,48 @@
     if (game && cam && (phase === 'angle' || phase === 'power')) cam.scale = targetScale();
   });
 
-  let pref, game, phase, angle, power, gaugeT, cam, prevPose, accum, trail, lastTs, settledAt, airborne = false, lastThud = 0, landedOnce = false;
+  let pref, game, phase, angle, power, gaugeT, cam, prevPoses, accum, trail, lastTs, settledAt, airborne = false, lastThud = 0, landedOnce = false;
+  let justUnlocked = null;
   const PLAY_SPEED = 1;           // 再生速度
   const STEP = 1000 / 60;
+  const STEP_BUDGET_MS = 12;      // 1フレームで物理計算に使ってよい時間
+  // 地球モードの星空(画面座標、0〜1)
+  const STARS = Array.from({ length: 140 }, (_, i) => ({ x: (Math.sin(i * 12.9898) * 43758.5453) % 1, y: (Math.sin(i * 78.233) * 12345.678) % 1, r: (i % 5 === 0) ? 1.6 : 0.9 }))
+    .map(s => ({ x: Math.abs(s.x), y: Math.abs(s.y), r: s.r }));
+
+  const earthMode = () => game && game.mode === 'earth';
+  const col = () => regionOf(baseIdOf(pref)).color;
 
   function startGame(id) {
-    pref = SHAPES.find(p => p.id === id);
-    game = PrefPhysics.createGame(Matter, pref);
+    pref = getPref(id);
+    game = PrefPhysics.createGame(Matter, pref, { mode });
     phase = 'angle'; angle = 0; power = 0; gaugeT = 0; accum = 0; trail = []; settledAt = 0; airborne = false; landedOnce = false;
+    justUnlocked = null;
     $('select').classList.remove('on'); $('play').classList.add('on');
     resize();
-    cam = { x: 0, y: game.startY, scale: targetScale() };
-    cam.x = game.body.position.x + camLead(cam.scale);
-    prevPose = pose();
+    cam = { x: 0, y: 0, scale: targetScale(), rot: 0 };
+    if (earthMode()) placeEarthCamera(1); else cam.x = game.body.position.x + camLead(cam.scale);
+    prevPoses = poses();
     $('result').classList.remove('on');
+    $('play').classList.toggle('space', earthMode());
     $('hudName').textContent = pref.name;
-    $('hudInfo').textContent = `面積 ${pref.area.toLocaleString()} km²` + (best[id] ? ` ／ ベスト ${fmt(best[id].d)} km` : '');
+    const b = bestOf(id);
+    $('hudInfo').textContent = (earthMode() ? '地球モード ／ ' : '') + `面積 ${pref.area.toLocaleString()} km²` + (b && b.d ? ` ／ ベスト ${fmt(b.d)} km` : '');
     $('hudDist').textContent = '0'; $('hudHeight').textContent = '';
     $('gauges').style.display = ''; $('tapMsg').textContent = 'タップで角度を止めて';
     $('gAng').className = 'gauge ang'; $('gPow').className = 'gauge pow dim';
     lastTs = performance.now();
   }
 
-  function pose() { const b = game.body; return { x: b.position.x, y: b.position.y, a: b.angle }; }
+  const poses = () => game.units.map(u => ({ x: u.body.position.x, y: u.body.position.y, a: u.body.angle }));
+  // カメラが追いかける島(地球モードで本体が宇宙へ行ったら、本体を追いかける)
+  function camUnit() {
+    if (earthMode()) {
+      const m = game.units[0];
+      return (m.status === 'escaped' || m.status === 'satellite') ? m : game.lead();
+    }
+    return game.lead();
+  }
 
   function onTap() {
     if (phase === 'angle') {
@@ -352,10 +438,13 @@
       $('gPow').className = 'gauge pow done';
       $('tapMsg').textContent = '';
       game.launch(angle, power);
-      prevPose = pose();
+      prevPoses = poses();
       shake = 1.4;
       sound.fire();
       airborne = true;
+      // 長崎・沖縄を撃つと、真・長崎県/真・沖縄県が解禁
+      const t = TRUE_PREFS.find(x => x.baseId === pref.id);
+      if (t && !unlocked[pref.id]) { unlocked[pref.id] = true; save('prefCannonUnlock', unlocked); justUnlocked = t.name; }
     }
   }
   cv.addEventListener('pointerdown', e => { e.preventDefault(); onTap(); });
@@ -375,7 +464,8 @@
   // カメラ: 県の大きさと高さが収まるように
   // 地上では全県共通の縮尺(北海道が画面幅の7割くらい)。高く飛んだ時だけ引く
   function targetScale() {
-    const h = Math.max(0, -game.body.bounds.min.y);
+    const u = game ? camUnit() : null;
+    const h = !u ? 0 : earthMode() ? Math.max(0, game.altitudeKm(u) / KPU + PrefPhysics.radiusOf(u.body)) : Math.max(0, -u.body.bounds.min.y);
     const worldH = Math.max(REF_R * 2.4, h * 1.25 + REF_R * 1.0) / 0.78;
     const worldW = REF_R * 2.9;
     const sc = Math.min(H / worldH, W / worldW);
@@ -386,53 +476,188 @@
   // 県を画面の左寄り(左から35%)に置くための、カメラの先回り量
   const camLead = sc => W * 0.15 / sc;
 
+  // 地球モードのカメラ: 足元の地面が常に画面の下(80%の高さ)に水平に来るよう、回転しながら追いかける
+  function placeEarthCamera(k) {
+    const u = camUnit(), b = u.body, C = game.C;
+    const phi = Math.atan2(b.position.x - C.x, C.y - b.position.y);
+    const n = { x: Math.sin(phi), y: -Math.cos(phi) }, t = { x: Math.cos(phi), y: Math.sin(phi) };
+    const s = cam.scale || targetScale();
+    const gx = C.x + n.x * game.R, gy = C.y + n.y * game.R;
+    const fx = gx + n.x * (0.3 * H / s) + t.x * camLead(s), fy = gy + n.y * (0.3 * H / s) + t.y * camLead(s);
+    cam.x += (fx - cam.x) * k; cam.y += (fy - cam.y) * k;
+    let d = Math.atan2(Math.sin(phi - cam.rot), Math.cos(phi - cam.rot));
+    cam.rot += d * k;
+  }
+
   function frame(ts) {
     requestAnimationFrame(frame);
     if (!$('play').classList.contains('on') || !game) return;
     const dt = Math.min(50, ts - lastTs); lastTs = ts;
 
-    if (phase === 'angle') { gaugeT += dt; angle = Math.round(tri(gaugeT, 2200) * 90); game.aim(angle); prevPose = pose(); }
+    if (phase === 'angle') { gaugeT += dt; angle = Math.round(tri(gaugeT, 2200) * 90); game.aim(angle); prevPoses = poses(); }
     if (phase === 'power') { gaugeT += dt; power = Math.max(1, Math.round(tri(gaugeT, 1300) * 100)); }
 
     let alpha = 1;
     if (phase === 'fly') {
-      accum += dt * PLAY_SPEED;
+      // 地球モードは、地球から離れるほど時間を早送りする(遠くの軌道でも待たされないように)
+      let warp = 1;
+      if (earthMode()) {
+        const u = camUnit(), r = Math.hypot(u.body.position.x - game.C.x, u.body.position.y - game.C.y) / game.R;
+        warp = Math.min(300, Math.max(1, r ** 1.5));
+      }
+      accum += dt * PLAY_SPEED * warp;
+      const t0 = performance.now();
+      const main = game.units[0];
       while (accum >= STEP && !game.settled) {
-        const vyBefore = Matter.Body.getVelocity(game.body).y;
-        prevPose = pose(); game.step(STEP); accum -= STEP;
-        const onGround = game.body.bounds.max.y > -0.5;
-        if (airborne && onGround && vyBefore > 0.8 && ts - lastThud > 150) {
+        const v = Matter.Body.getVelocity(main.body);
+        let inward;
+        if (earthMode()) {
+          const dx = main.body.position.x - game.C.x, dy = main.body.position.y - game.C.y, r = Math.hypot(dx, dy);
+          inward = -(v.x * dx + v.y * dy) / r;
+        } else inward = v.y;
+        prevPoses = poses(); game.step(STEP); accum -= STEP;
+        const onGround = game.clearance(main.body) < 0.5;
+        if (airborne && onGround && inward > 0.8 && ts - lastThud > 150) {
           if (!landedOnce) { landedOnce = true; sound.quake(); shake = 1.8; }
-          else { sound.land(vyBefore / 12); shake = Math.max(shake, Math.min(1, vyBefore / 10)); }
+          else { sound.land(inward / 12); shake = Math.max(shake, Math.min(1, inward / 10)); }
           lastThud = ts;
         }
         airborne = !onGround;
-        if (game.steps % 3 === 0) trail.push({ x: game.body.position.x, y: game.body.position.y });
+        if (game.steps % 3 === 0) {
+          trail.push({ x: main.body.position.x, y: main.body.position.y });
+          if (trail.length > 3000) trail.splice(0, trail.length - 3000);
+        }
+        if (performance.now() - t0 > STEP_BUDGET_MS) { accum = Math.min(accum, STEP); break; }
       }
-      alpha = game.settled ? 1 : accum / STEP;
+      alpha = game.settled ? 1 : Math.min(1, accum / STEP);
       if (game.settled && !settledAt) { settledAt = ts; finish(); }
     }
     $('fAng').style.width = (angle / 90 * 100) + '%'; $('vAng').textContent = angle + '°';
     $('fPow').style.width = power + '%'; $('vPow').textContent = power + '%';
 
-    const cur = pose();
-    const p = { x: prevPose.x + (cur.x - prevPose.x) * alpha, y: prevPose.y + (cur.y - prevPose.y) * alpha, a: prevPose.a + (cur.a - prevPose.a) * alpha };
+    const cur = poses();
+    const ps = cur.map((c, i) => {
+      const p = prevPoses[i] || c;
+      return { x: p.x + (c.x - p.x) * alpha, y: p.y + (c.y - p.y) * alpha, a: p.a + (c.a - p.a) * alpha };
+    });
 
+    const k = 1 - Math.pow(0.04, dt / 1000);
     if (phase === 'fly' || phase === 'done') {
-      const raw = (p.x + (game.body.bounds.max.x - cur.x) - game.startX) * KPU;
-      $('hudDist').textContent = fmt(Math.max(0, raw));
-      const hgt = Math.max(0, -game.body.bounds.max.y * KPU);
-      $('hudHeight').textContent = hgt > 1 ? `高さ ${fmt(hgt)} km` : '';
-      // カメラ追従
-      const k = 1 - Math.pow(0.04, dt / 1000);
-      cam.x += (p.x + camLead(cam.scale) - cam.x) * k * 2.5;
-      cam.scale += (targetScale() - cam.scale) * k;
+      const u = camUnit();
+      if (earthMode()) {
+        const km = Math.max(0, u.phi * game.R * KPU);
+        $('hudDist').textContent = fmt(km);
+        const alt = game.altitudeKm(u);
+        const parts = [];
+        if (alt > 1) parts.push(`高度 ${fmt(alt)} km`);
+        parts.push(`経過 ${fmtDuration(game.realElapsedSec())}`);
+        $('hudHeight').textContent = parts.join(' ／ ');
+        // 地球モードは速いので、カメラも素早く追いかける(置いていかれないように)
+        const ke = 1 - Math.pow(0.0002, dt / 1000);
+        // 引く(ズームアウト)のは即座に、寄るのはなめらかに
+        const ts = targetScale();
+        cam.scale = ts < cam.scale ? ts : cam.scale + (ts - cam.scale) * ke;
+        placeEarthCamera(ke);
+      } else {
+        const i = game.units.indexOf(u), p = ps[i];
+        const raw = (p.x + (u.body.bounds.max.x - cur[i].x) - game.startX) * KPU;
+        $('hudDist').textContent = fmt(Math.max(0, raw));
+        const hgt = Math.max(0, -u.body.bounds.max.y * KPU);
+        $('hudHeight').textContent = hgt > 1 ? `高さ ${fmt(hgt)} km` : '';
+        // カメラ追従
+        if (pref.islands) {
+          // 島がバラバラに飛ぶので、先頭を見失わないよう素早く追いかけ、引く時は即座に引く
+          const ts = targetScale();
+          cam.x += (p.x + camLead(cam.scale) - cam.x) * Math.min(1, k * 6);
+          cam.scale = ts < cam.scale ? ts : cam.scale + (ts - cam.scale) * k;
+        } else {
+          cam.x += (p.x + camLead(cam.scale) - cam.x) * k * 2.5;
+          cam.scale += (targetScale() - cam.scale) * k;
+        }
+      }
+    } else if (earthMode()) {
+      placeEarthCamera(1);
     }
-    draw(p);
+    if (earthMode()) drawEarth(ps); else draw(ps);
     shake *= 0.9;
   }
 
-  function draw(p) {
+  // ===== 描画の共通部品 =====
+  function drawStar(x, y, R, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rr = i % 2 ? R * 0.45 : R, t = -Math.PI / 2 + i * Math.PI / 5;
+      i ? ctx.lineTo(Math.cos(t) * rr, Math.sin(t) * rr) : ctx.moveTo(Math.cos(t) * rr, Math.sin(t) * rr);
+    }
+    ctx.closePath(); ctx.fillStyle = '#f2b632'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#1f2440'; ctx.stroke();
+    ctx.restore();
+  }
+  function roundRect(x, y, w, h, rr) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); }
+  // 島(県)の形を描く。ctx は「物理単位 → 画面」の変換が済んだ状態で呼ぶ。pxPerUnit は線の太さの調整用
+  let shapeStroke = '#1f2440';
+  function drawUnitShape(u, p, pxPerUnit) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.a);
+    ctx.scale(1 / KPU, 1 / KPU);
+    ctx.translate(-u.com.x * KPU + u.off[0], -u.com.y * KPU + u.off[1]);
+    ctx.beginPath();
+    for (const ring of [u.outline, ...(u.holes || [])]) {
+      ring.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
+      ctx.closePath();
+    }
+    ctx.fillStyle = col(); ctx.fill('evenodd');
+    ctx.lineWidth = Math.min(2.5 * KPU / pxPerUnit, 0.5 * Math.sqrt(u.area)); ctx.strokeStyle = shapeStroke; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.restore();
+  }
+  // 画面の外にいる島の方向に、矢印を出す
+  function drawOffscreenArrows(points) {
+    const m = 18;
+    for (const pt of points) {
+      if (pt.x >= -4 && pt.x <= W + 4 && pt.y >= -4 && pt.y <= H + 4) continue;
+      const cx = W / 2, cy = H / 2, dx = pt.x - cx, dy = pt.y - cy;
+      const sc = Math.min((W / 2 - m) / Math.abs(dx || 1e-6), (H / 2 - m) / Math.abs(dy || 1e-6));
+      const x = cx + dx * sc, y = cy + dy * sc, a = Math.atan2(dy, dx);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath();
+      ctx.fillStyle = col(); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#1f2440'; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function drawLabel(x, topY, small) {
+    ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
+    if (small) {
+      // 小さい県は見失いやすいので、目印のピンを立てる
+      ctx.fillStyle = '#d6382f';
+      ctx.beginPath(); ctx.moveTo(x, topY - 6); ctx.lineTo(x - 8, topY - 20); ctx.lineTo(x + 8, topY - 20); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = earthMode() ? '#e8f0ff' : '#1f2440';
+      ctx.fillText(pref.name, x, topY - 26);
+    } else {
+      ctx.fillStyle = earthMode() ? '#e8f0ff' : '#1f2440';
+      ctx.fillText(pref.name, x, topY - 10);
+    }
+  }
+  function drawCannon(r, toPx, s) {
+    // toPx: 物理座標 → 画面座標の変換が済んだ ctx に対して、物理単位で描く
+    const baseX = game.startX - r * 1.15, baseY = 0;
+    const th = -angle * Math.PI / 180;
+    ctx.save();
+    ctx.translate(baseX, baseY - r * 0.55);
+    ctx.rotate(th);
+    ctx.fillStyle = '#2b2f45'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2 / s;
+    roundRect(-r * 0.3, -r * 0.42, r * 2.1, r * 0.84, r * 0.2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d6382f'; ctx.fillRect(r * 1.55, -r * 0.46, r * 0.25, r * 0.92);
+    ctx.restore();
+    ctx.fillStyle = '#8a5a34'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2 / s;
+    ctx.beginPath(); ctx.arc(baseX, baseY - r * 0.55, r * 0.55, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#5c3a20'; ctx.beginPath(); ctx.arc(baseX, baseY - r * 0.55, r * 0.18, 0, Math.PI * 2); ctx.fill();
+  }
+  const cannonSize = () => game.size * ((PrefPhysics.CANNON_BOOST[baseIdOf(pref)] || 1) > 1 ? 1.2 : 1);
+
+  // ===== 通常モードの描画 =====
+  function draw(ps) {
     const s = cam.scale;
     if (!(s > 0) || !isFinite(s) || !W || !H) return;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -470,8 +695,8 @@
       ctx.fillText((km || 0).toLocaleString() + 'km', x, toY(0) + 26);
     }
     // 自己ベストの旗
-    const bst = best[pref.id];
-    if (bst) {
+    const bst = bestOf(pref.id);
+    if (bst && bst.d) {
       const x = toX(game.startX + bst.d / KPU), y = toY(0);
       ctx.strokeStyle = '#1f2440'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 46); ctx.stroke();
       ctx.fillStyle = '#d6382f'; ctx.beginPath(); ctx.moveTo(x, y - 46); ctx.lineTo(x + 26, y - 39); ctx.lineTo(x, y - 32); ctx.fill();
@@ -482,100 +707,183 @@
     ctx.fillStyle = 'rgba(31,36,64,.35)';
     for (const t of trail) { ctx.beginPath(); ctx.arc(toX(t.x), toY(t.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
 
+    // ここから先は「物理座標 → 画面」の変換をかけて描く
+    ctx.save();
+    ctx.translate(W * 0.5 + sx - cam.x * s, groundPx + sy - PrefPhysics.GROUND_Y * s);
+    ctx.scale(s, s);
     // 大砲(県の大きさに合わせて巨大化。火薬の多い県はさらに一回り大きく)
-    const r = game.size * ((PrefPhysics.CANNON_BOOST[pref.id] || 1) > 1 ? 1.2 : 1);
-    const baseX = game.startX - r * 1.15, baseY = 0;
-    const th = -angle * Math.PI / 180;
-    ctx.save();
-    ctx.translate(toX(baseX), toY(baseY - r * 0.55));
-    ctx.rotate(th);
-    ctx.fillStyle = '#2b2f45'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2;
-    roundRect(-r * 0.3 * s, -r * 0.42 * s, r * 2.1 * s, r * 0.84 * s, r * 0.2 * s); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#d6382f'; ctx.fillRect(r * 1.55 * s, -r * 0.46 * s, r * 0.25 * s, r * 0.92 * s);
-    ctx.restore();
-    ctx.fillStyle = '#8a5a34'; ctx.strokeStyle = '#11131f'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(toX(baseX), toY(baseY - r * 0.55), r * 0.55 * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#5c3a20'; ctx.beginPath(); ctx.arc(toX(baseX), toY(baseY - r * 0.55), r * 0.18 * s, 0, Math.PI * 2); ctx.fill();
-
+    const r = cannonSize();
+    drawCannon(r, null, s);
     // 狙いの角度ライン
+    const lead = game.units[0], lp = ps[0];
     if (phase === 'angle' || phase === 'power') {
-      const L = r * 4.5;
-      ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(214,56,47,.8)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(toX(p.x), toY(p.y));
-      ctx.lineTo(toX(p.x + Math.cos(-th) * L), toY(p.y - Math.sin(-th) * L)); ctx.stroke(); ctx.setLineDash([]);
+      const L = r * 4.5, th = angle * Math.PI / 180;
+      ctx.setLineDash([6 / s, 6 / s]); ctx.strokeStyle = 'rgba(214,56,47,.8)'; ctx.lineWidth = 2 / s;
+      const ox = pref.islands ? game.startX : lp.x, oy = pref.islands ? game.startY : lp.y;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(th) * L, oy - Math.sin(th) * L); ctx.stroke(); ctx.setLineDash([]);
     }
-
-    // 県
-    const col = regionOf(pref.id).color;
-    ctx.save();
-    ctx.translate(toX(p.x), toY(p.y));
-    ctx.rotate(p.a);
-    ctx.scale(s / KPU, s / KPU);
-    ctx.translate(-game.com.x * KPU + pref.off[0], -game.com.y * KPU + pref.off[1]);
-    ctx.beginPath();
-    for (const ring of [pref.outline, ...(pref.holes || [])]) {
-      ring.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
-      ctx.closePath();
-    }
-    ctx.fillStyle = col; ctx.fill('evenodd');
-    ctx.lineWidth = 2.5 * KPU / s; ctx.strokeStyle = '#1f2440'; ctx.lineJoin = 'round'; ctx.stroke();
+    // 県(島)
+    game.units.forEach((u, i) => drawUnitShape(u, ps[i], s));
     ctx.restore();
-    // 県庁所在地(=重心、回転の中心)の★
-    drawStar(toX(p.x), toY(p.y), Math.max(4, Math.min(9, PrefPhysics.radiusOf(game.body) * s * 0.12)), p.a);
-    // 県名ラベル
-    ctx.font = '800 13px "M PLUS Rounded 1c", sans-serif'; ctx.textAlign = 'center';
-    ctx.fillStyle = '#1f2440';
-    const topY = toY(game.body.bounds.min.y);
-    const small = PrefPhysics.radiusOf(game.body) * s < 40;
-    if (small) {
-      // 小さい県は見失いやすいので、目印のピンを立てる
-      ctx.fillStyle = '#d6382f';
-      ctx.beginPath(); ctx.moveTo(toX(p.x), topY - 6); ctx.lineTo(toX(p.x) - 8, topY - 20); ctx.lineTo(toX(p.x) + 8, topY - 20); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#1f2440';
-      ctx.fillText(pref.name, toX(p.x), topY - 26);
-    } else {
-      ctx.fillText(pref.name, toX(p.x), topY - 10);
+
+    // 県庁所在地(=重心、回転の中心)の★(普通の県だけ)
+    if (!pref.islands) drawStar(toX(lp.x), toY(lp.y), Math.max(4, Math.min(9, PrefPhysics.radiusOf(lead.body) * s * 0.12)), lp.a);
+    // 県名ラベル(先頭の島の上)
+    const cu = camUnit(), ci = game.units.indexOf(cu);
+    drawLabel(toX(ps[ci].x), toY(cu.body.bounds.min.y), PrefPhysics.radiusOf(cu.body) * s < 40);
+    // 画面の外の島
+    if (pref.islands) drawOffscreenArrows(game.units.map((u, i) => ({ x: toX(ps[i].x), y: toY(ps[i].y) })));
+  }
+
+  // ===== 地球モードの描画 =====
+  function drawEarth(ps) {
+    const s = cam.scale;
+    if (!(s > 0) || !isFinite(s) || !W || !H) return;
+    const C = game.C, R = game.R;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // 空: 高く上がるほど暗くなって、宇宙では星空になる
+    const cu = camUnit();
+    // 暗さは県の一番低いところの高度で決める(発射前は昼の空)
+    const alt = Math.max(0, game.clearance(cu.body) * KPU);
+    const dark = Math.min(1, alt / 600);
+    const mix = (a, b) => a.map((v, i) => Math.round(v + (b[i] - v) * dark));
+    const top = mix([159, 201, 234], [4, 6, 20]), bottom = mix([234, 243, 246], [16, 22, 48]);
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, `rgb(${top})`); sky.addColorStop(1, `rgb(${bottom})`);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    if (dark > 0.05) {
+      ctx.fillStyle = `rgba(255,255,255,${dark * 0.9})`;
+      for (const st of STARS) { ctx.beginPath(); ctx.arc(st.x * W, st.y * H, st.r, 0, Math.PI * 2); ctx.fill(); }
     }
 
-    function drawStar(x, y, R, rot) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const rr = i % 2 ? R * 0.45 : R, t = -Math.PI / 2 + i * Math.PI / 5;
-        i ? ctx.lineTo(Math.cos(t) * rr, Math.sin(t) * rr) : ctx.moveTo(Math.cos(t) * rr, Math.sin(t) * rr);
-      }
-      ctx.closePath(); ctx.fillStyle = '#f2b632'; ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = '#1f2440'; ctx.stroke();
-      ctx.restore();
+    const sx = (shake * 10) * (Math.random() - 0.5), sy = (shake * 10) * (Math.random() - 0.5);
+    const cr = Math.cos(-cam.rot), sr = Math.sin(-cam.rot);
+    const toScreen = (x, y) => {
+      const dx = (x - cam.x) * s, dy = (y - cam.y) * s;
+      return { x: W / 2 + sx + dx * cr - dy * sr, y: H / 2 + sy + dx * sr + dy * cr };
+    };
+    ctx.save();
+    ctx.translate(W / 2 + sx, H / 2 + sy);
+    ctx.rotate(-cam.rot);
+    ctx.scale(s, s);
+    ctx.translate(-cam.x, -cam.y);
+    // 大気のもや(厚さ約100km)
+    const halo = ctx.createRadialGradient(C.x, C.y, R, C.x, C.y, R + 60);
+    halo.addColorStop(0, 'rgba(140,190,255,.55)'); halo.addColorStop(1, 'rgba(140,190,255,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(C.x, C.y, R + 60, 0, Math.PI * 2); ctx.fill();
+    // 地球
+    ctx.fillStyle = '#6fa05c'; ctx.beginPath(); ctx.arc(C.x, C.y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 4 / s; ctx.strokeStyle = '#4d7a40'; ctx.stroke();
+    // 発射地点の旗
+    ctx.strokeStyle = '#1f2440'; ctx.lineWidth = 2 / s;
+    ctx.beginPath(); ctx.moveTo(game.startX, 0); ctx.lineTo(game.startX, -40 / s); ctx.stroke();
+    ctx.fillStyle = '#d6382f'; ctx.beginPath(); ctx.moveTo(game.startX, -40 / s); ctx.lineTo(game.startX + 22 / s, -34 / s); ctx.lineTo(game.startX, -28 / s); ctx.fill();
+    // 軌跡
+    ctx.fillStyle = dark > 0.5 ? 'rgba(200,220,255,.55)' : 'rgba(31,36,64,.35)';
+    for (const t of trail) { ctx.beginPath(); ctx.arc(t.x, t.y, 2.5 / s, 0, Math.PI * 2); ctx.fill(); }
+    // 大砲
+    const r = cannonSize();
+    drawCannon(r, null, s);
+    // 狙いの角度ライン
+    const lp = ps[0];
+    if (phase === 'angle' || phase === 'power') {
+      const L = r * 4.5, th = angle * Math.PI / 180;
+      ctx.setLineDash([6 / s, 6 / s]); ctx.strokeStyle = 'rgba(214,56,47,.8)'; ctx.lineWidth = 2 / s;
+      const ox = pref.islands ? game.startX : lp.x, oy = pref.islands ? game.startY : lp.y;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(th) * L, oy - Math.sin(th) * L); ctx.stroke(); ctx.setLineDash([]);
     }
-    function roundRect(x, y, w, h, rr) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); }
+    // 県(島)。宇宙では輪郭を明るくして、暗い背景でも見えるように
+    shapeStroke = dark > 0.5 ? '#e8f0ff' : '#1f2440';
+    game.units.forEach((u, i) => drawUnitShape(u, ps[i], s));
+    shapeStroke = '#1f2440';
+    ctx.restore();
+
+    // ★とラベル(画面座標で)
+    if (!pref.islands) { const q = toScreen(lp.x, lp.y); drawStar(q.x, q.y, Math.max(4, Math.min(9, PrefPhysics.radiusOf(game.units[0].body) * s * 0.12)), lp.a - cam.rot); }
+    const ci = game.units.indexOf(cu), q = toScreen(ps[ci].x, ps[ci].y);
+    const rad = PrefPhysics.radiusOf(cu.body) * s;
+    drawLabel(q.x, q.y - rad, rad < 40);
+    drawOffscreenArrows(game.units.map((u, i) => toScreen(ps[i].x, ps[i].y)));
   }
 
   function finish() {
     phase = 'done';
     $('gauges').style.display = 'none';
+    const earth = earthMode();
+    const outcome = game.outcome();
     const raw = game.rawDistanceKm(), d = Math.max(0, raw);
-    const prev = best[pref.id];
-    const isNew = !prev || d > prev.d;
-    if (isNew && d > 0) { best[pref.id] = { d, a: angle, p: power }; store.set(best); }
-    const lm = d >= 1 ? pickLandmark(pref.id, d) : null;
+    const recU = game.recordUnit();
+    const prev = bests[mode][pref.id];
+    let isNew = false, newLabel = '自己ベスト更新！';
+    const entry = Object.assign({}, prev || {});
+    if (outcome === 'landed' && d > 0 && (!prev || !prev.d || d > prev.d)) { entry.d = d; entry.a = angle; entry.p = power; isNew = true; }
+    if (outcome === 'satellite' && !(prev && prev.sat)) { entry.sat = true; isNew = true; newLabel = 'はじめての衛星化！'; }
+    if (outcome === 'escaped' && !(prev && prev.esc)) { entry.esc = true; isNew = true; newLabel = 'はじめての宇宙進出！'; }
+    if (isNew) { bests[mode][pref.id] = entry; saveBests(); }
+
+    // 飛距離の目安(地球の裏側を越えたら、残りの距離で測る)
+    let lm = null, around = '';
+    if (outcome === 'landed' && d >= 1) {
+      if (d >= EARTH_CIRC) around = '地球を1周以上まわって落ちた';
+      else lm = pickLandmark(baseIdOf(pref), d > EARTH_CIRC / 2 ? EARTH_CIRC - d : d);
+    }
     setTimeout(() => {
-      $('rName').textContent = pref.name + ' の飛距離';
-      $('rDist').textContent = fmt(d);
-      // 発射速度(km/s): 最初の1秒間の平均の速さ(物理の時間で計測)
-      const v0 = Math.round(game.launchSpeed()).toLocaleString();
-      $('rSpec').innerHTML = `角度 ${angle}° ／ パワー ${power}%<br>発射速度 ${v0} km/s`;
-      $('rBadge').innerHTML = isNew && d > 0 ? '<span class="nb">自己ベスト更新！</span>' : (prev ? `<div class="cmp">ベストは ${fmt(prev.d)} km</div>` : '');
-      $('rCmp').textContent = raw < 0 ? '後ろに転がっちゃったわね…' : (lm ? `${lm.home}から ${lm.place} くらいの距離` : 'まだ近所ね');
-      const text = `${pref.name}を 発射速度${v0}km/s で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
+      const big = $('rBig');
+      if (outcome === 'satellite' || outcome === 'escaped') {
+        $('rName').textContent = '地球モードの結果';
+        big.classList.add('msg');
+        $('rDist').textContent = outcome === 'satellite' ? `${pref.name}は地球の第二の衛星となった` : `${pref.name}は宇宙の彼方へ旅立って行った`;
+        $('rUnit').style.display = 'none';
+      } else {
+        $('rName').textContent = pref.name + (earth ? ' の飛距離(地球の表面に沿って)' : ' の飛距離');
+        big.classList.remove('msg');
+        $('rDist').textContent = fmt(d);
+        $('rUnit').style.display = '';
+      }
+      // 真・○○県: 記録を出した島と、宇宙へ行った島の数
+      let isl = '';
+      if (pref.islands) {
+        if (outcome === 'landed' && recU) isl = `一番遠くまで飛んだのは ${recU.name}`;
+        if (earth) {
+          const sat = game.units.filter(u => u.status === 'satellite').length, esc = game.units.filter(u => u.status === 'escaped').length;
+          const extra = [];
+          if (sat) extra.push(`${sat}島が衛星に`);
+          if (esc) extra.push(`${esc}島が宇宙へ`);
+          if (extra.length && outcome === 'landed') isl += `（${extra.join('、')}）`;
+          else if (extra.length) isl = `${game.units.length}島のうち ${extra.join('、')}`;
+        }
+      }
+      $('rIsland').textContent = isl;
+      let speed, spec;
+      if (earth) {
+        speed = game.realSpeedKmS(game.v0).toFixed(1);
+        spec = `角度 ${angle}° ／ パワー ${power}%<br>初速 ${speed} km/s ／ 飛行時間 ${fmtDuration(game.realElapsedSec())}`;
+      } else {
+        // 発射速度(km/s): 最初の1秒間の平均の速さ(物理の時間で計測)
+        speed = Math.round(game.launchSpeed()).toLocaleString();
+        spec = `角度 ${angle}° ／ パワー ${power}%<br>発射速度 ${speed} km/s`;
+      }
+      $('rSpec').innerHTML = spec;
+      const badges = [];
+      if (isNew) badges.push(`<span class="nb">${newLabel}</span>`);
+      if (justUnlocked) badges.push(`<span class="nb">${justUnlocked}が解禁された！</span>`);
+      $('rBadge').innerHTML = badges.length ? badges.join(' ')
+        : (prev && prev.d && outcome === 'landed' ? `<div class="cmp">ベストは ${fmt(prev.d)} km</div>` : '');
+      $('rCmp').textContent = outcome !== 'landed' ? '' : raw < 0 ? '後ろに転がっちゃったわね…'
+        : around ? around : (lm ? `${lm.home}から ${lm.place} くらいの距離` : 'まだ近所ね');
+      let text;
+      if (outcome === 'satellite') text = `${pref.name}は地球の第二の衛星となった（初速${speed}km/s）\n#都道府県キャノン #地球モード`;
+      else if (outcome === 'escaped') text = `${pref.name}は宇宙の彼方へ旅立って行った（初速${speed}km/s）\n#都道府県キャノン #地球モード`;
+      else if (earth) text = `${pref.name}を 初速${speed}km/s で撃ったら 地球を${fmt(d)}km 飛んだ！\n#都道府県キャノン #地球モード`;
+      else text = `${pref.name}を 発射速度${speed}km/s で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
       const url = location.href.split('#')[0].split('?')[0];
       $('postBtn').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(text) + (url.startsWith('http') ? '&url=' + encodeURIComponent(url) : '');
       $('result').classList.add('on');
-      sound.jingle(isNew && d > 0);
+      sound.jingle(isNew);
     }, 700);
   }
 
-  renderTabs(); renderGrid(); resize();
+  renderMode(); renderTabs(); renderGrid(); resize();
   requestAnimationFrame(frame);
 })();
 </script>
