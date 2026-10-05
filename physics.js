@@ -64,7 +64,7 @@
     // 撃ち出すもの: 普通の県は1つ、真・○○県は島ごとに1つずつ
     const islands = pref.islands || [pref];
     const density = DENSITY * Math.pow(pref.area / REF_AREA, MASS_EXP - 1);
-    const units = islands.map((isl, idx) => {
+    const makeParts = isl => {
       const parts = isl.parts.map(pts =>
         Bodies.fromVertices(0, 0, [pts.map(([x, y]) => ({ x: x / KM_PER_UNIT, y: y / KM_PER_UNIT }))], {
           density, friction: 0.9, restitution: earth ? EARTH_BOUNCE : 0.5
@@ -78,7 +78,10 @@
         }
         A /= 2; Body.setPosition(parts[i], { x: cx / (6 * A) / KM_PER_UNIT, y: cy / (6 * A) / KM_PER_UNIT });
       });
-      const body = Body.create({ parts, friction: 0.9, restitution: earth ? EARTH_BOUNCE : 0.5, frictionAir: 0 });
+      return parts;
+    };
+    const islandUnits = islands.map((isl, idx) => {
+      const body = Body.create({ parts: makeParts(isl), friction: 0.9, restitution: earth ? EARTH_BOUNCE : 0.5, frictionAir: 0 });
       // 重心を県庁所在地に移す(回転の中心もここになる)。慣性モーメントは平行軸の定理で補正
       if (!pref.islands && pref.cap) {
         const cap = { x: pref.cap[0] / KM_PER_UNIT, y: pref.cap[1] / KM_PER_UNIT };
@@ -97,13 +100,30 @@
         still: 0, touched: false, touchStep: 0, status: 'flying', phi: 0, phiRaw: 0,
       };
     });
-    const main = units[0];
-    const body = main.body;
+    // 真・○○県: 着地するまでは全部の島を1つの塊として飛ばし、最初に地面に触れた瞬間に島ごとに分解する
+    let group = null;
+    if (pref.islands) {
+      const gb = Body.create({ parts: islands.flatMap(makeParts), friction: 0.9, restitution: earth ? EARTH_BOUNCE : 0.5, frictionAir: 0 });
+      group = {
+        body: gb, idx: 0, isGroup: true, name: pref.name, area: pref.area,
+        rings: islands.map(i => i.outline), off: [0, 0],
+        com: { x: gb.position.x, y: gb.position.y },
+        eqWidth: 2 * Math.sqrt(pref.area / Math.PI) / KM_PER_UNIT,
+        still: 0, touched: false, touchStep: 0, status: 'flying', phi: 0, phiRaw: 0,
+      };
+      // 分解するときに使う、塊の重心から見た各島の位置(傾ける前)
+      islandUnits.forEach(u => { u.local = { x: u.body.position.x - gb.position.x, y: u.body.position.y - gb.position.y }; });
+      // 描画用: 塊の中の各島の位置と大きさ
+      group.subs = islandUnits.map(u => ({ local: u.local, r: radiusOf(u.body) }));
+    }
+    let units = group ? [group] : islandUnits;
+    let main = units[0];
+    let body = main.body;
     const totalMass = units.reduce((s, u) => s + u.body.mass, 0);
     // 発射台の基準点(普通の県は県庁所在地、真・○○県は県庁所在地のある座標の原点)
     const pivot = pref.islands ? { x: 0, y: 0 } : { x: body.position.x, y: body.position.y };
     units.forEach(u => { u.offset = { x: u.body.position.x - pivot.x, y: u.body.position.y - pivot.y }; });
-    const size = radiusOf(body);    // 傾ける前の大きさ(大砲の大きさに使う)
+    const size = radiusOf(islandUnits[0].body);    // 傾ける前の大きさ(大砲の大きさに使う)
 
     // 発射位置: 最下点が地面から少し上になる高さ
     const maxY = Math.max(...units.map(u => u.body.bounds.max.y));
@@ -177,7 +197,8 @@
       const th = angleDeg * Math.PI / 180;
       for (const u of units) {
         Body.setVelocity(u.body, { x: v * Math.cos(th), y: -v * Math.sin(th) });
-        Body.setAngularVelocity(u.body, -0.004 * (0.5 + powerPct / 200));
+        // 回転を付ける(島の塊は巨大で、少し回っただけで端が地面をこするので回さない)
+        Body.setAngularVelocity(u.body, u.isGroup ? 0 : -0.004 * (0.5 + powerPct / 200));
         if (earth) { u.phiRaw = angleAround(u.body.position); u.phi = u.phiRaw; }
       }
       state.launched = true;
@@ -245,7 +266,17 @@
       const n = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(fastest / MAX_MOVE)));
       updateGround();
       const before = { x: body.position.x, y: body.position.y };
-      for (let i = 0; i < n; i++) subStep(dt / n, 1 / n);
+      for (let i = 0; i < n; i++) {
+        // 塊が地面にぶつかる直前に分解する(ぶつかった衝撃で巨大な塊が急回転して、端の島が振り回されないように)
+        if (group && units[0] === group) {
+          // 次の細かい計算で地面に届きそうか(地面に向かう方向の速さで判定)
+          const gb = group.body, v = Body.getVelocity(gb);
+          let toward = v.y;
+          if (earth) { const dx = gb.position.x - C.x, dy = gb.position.y - C.y, r = Math.hypot(dx, dy); toward = -(v.x * dx + v.y * dy) / r; }
+          if (clearance(gb) < Math.max(0, toward) / n + 0.5) breakApart();
+        }
+        subStep(dt / n, 1 / n);
+      }
       // 発射速度の計測(表示専用。物理には影響しない): 最初の1秒(60コマ)で進んだ道のり
       if (state.steps < 60) state.path1s += Math.hypot(body.position.x - before.x, body.position.y - before.y) * KM_PER_UNIT;
       state.steps++;
@@ -276,6 +307,32 @@
         state.settled = true;
       }
     };
+
+    // 塊を島ごとに分解する。各島は、その瞬間の塊の位置・向き・速さ・回転をそのまま引き継ぐ
+    function breakApart() {
+      const g = group.body, th = g.angle, c = Math.cos(th), s = Math.sin(th);
+      const v = Body.getVelocity(g), w = Body.getAngularVelocity(g);
+      Composite.remove(engine.world, g);
+      for (const u of islandUnits) {
+        const d = { x: u.local.x * c - u.local.y * s, y: u.local.x * s + u.local.y * c };
+        Body.setPosition(u.body, { x: g.position.x + d.x, y: g.position.y + d.y });
+        Body.setAngle(u.body, th);
+        // 地面にめり込んだまま切り離すと、押し戻されて弾け飛ぶので、地表まで持ち上げておく
+        const sink = 0.2 - clearance(u.body);
+        if (sink > 0) {
+          let nx = 0, ny = -1;
+          if (earth) { const dx = u.body.position.x - C.x, dy = u.body.position.y - C.y, r = Math.hypot(dx, dy); nx = dx / r; ny = dy / r; }
+          Body.setPosition(u.body, { x: u.body.position.x + nx * sink, y: u.body.position.y + ny * sink });
+        }
+        Body.setVelocity(u.body, { x: v.x - w * d.y, y: v.y + w * d.x });
+        Body.setAngularVelocity(u.body, w);
+        if (earth) { u.phiRaw = angleAround(u.body.position); u.phi = group.phi + wrap(u.phiRaw - group.phiRaw); }
+        Composite.add(engine.world, u.body);
+      }
+      units = islandUnits; state.units = units;
+      main = units[0]; body = main.body; state.body = body;
+      state.brokeStep = state.steps + 1;
+    }
 
     // 地球モード: 地球をまわった角度を数えて、1周したら衛星、重力を振り切ったら脱出
     function trackOrbit(u) {

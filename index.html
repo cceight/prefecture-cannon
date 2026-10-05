@@ -120,7 +120,7 @@
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=12" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=14" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -152,9 +152,9 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=12"></script>
-<script src="physics.js?v=12"></script>
-<script src="landmarks.js?v=12"></script>
+<script src="shapes.js?v=14"></script>
+<script src="physics.js?v=14"></script>
+<script src="landmarks.js?v=14"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -335,6 +335,12 @@
         tone(95, 0, 0.6, { type: 'triangle', vol: 0.7, to: 30, drive: true });
         noise(0.05, 2.4, { vol: 0.5, cutoff: 450, to: 60, attack: 0.08, linear: true });
       },
+      // 大気圏突入: ゴォォォという轟音と、パチパチ焼ける音
+      reentry() {
+        noise(0, 3.2, { vol: 0.75, cutoff: 900, to: 160, attack: 0.5, linear: true, drive: true });
+        noise(0.2, 2.6, { vol: 0.22, cutoff: 2600, to: 1200, filter: 'bandpass', attack: 0.4, linear: true });
+        tone(42, 0, 3.0, { type: 'sine', vol: 0.5, to: 30 });
+      },
       // 最初の着地: 地鳴りの低音 + 土砂が崩れる音
       quake() {
         tone(52, 0, 1.6, { type: 'sine', vol: 1.0, to: 22, drive: true });
@@ -386,6 +392,7 @@
 
   let pref, game, phase, angle, power, gaugeT, cam, prevPoses, accum, trail, lastTs, settledAt, airborne = false, lastThud = 0, landedOnce = false;
   let justUnlocked = null;
+  let reentry = new Map(), sparks = [];   // 大気圏突入の演出(島ごとの状態と、火の粉)
   const PLAY_SPEED = 1;           // 再生速度
   const STEP = 1000 / 60;
   const STEP_BUDGET_MS = 12;      // 1フレームで物理計算に使ってよい時間
@@ -400,7 +407,7 @@
     pref = getPref(id);
     game = PrefPhysics.createGame(Matter, pref, { mode });
     phase = 'angle'; angle = 0; power = 0; gaugeT = 0; accum = 0; trail = []; settledAt = 0; airborne = false; landedOnce = false;
-    justUnlocked = null;
+    justUnlocked = null; reentry = new Map(); sparks = [];
     $('select').classList.remove('on'); $('play').classList.add('on');
     resize();
     cam = { x: 0, y: 0, scale: targetScale(), rot: 0 };
@@ -504,11 +511,19 @@
       if (earthMode()) {
         const u = camUnit(), r = Math.hypot(u.body.position.x - game.C.x, u.body.position.y - game.C.y) / game.R;
         warp = Math.min(300, Math.max(1, r ** 1.5));
+        // 大気圏に突入して燃えている間はスローモーション(現実では十数秒の出来事なので、早送りのままだと一瞬で終わる)
+        // 本体の行き先が決まったあとは、残りの島を一気に早送りする
+        if (game.units[0].status !== 'flying' && game.units.some(u => u.status === 'flying')) warp = Math.max(warp, 80);
+        const st = reentry.get(camUnit());
+        if (st && st.slow > 0) {
+          if (st.I > 0.1) warp = Math.min(warp, 0.03); else if (st.near) warp = Math.min(warp, 0.15);
+          if (st.I > 0.1 || st.near) st.slow -= dt;
+        }
       }
       accum += dt * PLAY_SPEED * warp;
       const t0 = performance.now();
-      const main = game.units[0];
       while (accum >= STEP && !game.settled) {
+        const main = game.units[0];
         const v = Matter.Body.getVelocity(main.body);
         let inward;
         if (earthMode()) {
@@ -516,6 +531,8 @@
           inward = -(v.x * dx + v.y * dy) / r;
         } else inward = v.y;
         prevPoses = poses(); game.step(STEP); accum -= STEP;
+        // 真・○○県が地面にぶつかる直前に分解した瞬間
+        if (game.brokeStep === game.steps) { sound.quake(); shake = 2; landedOnce = true; lastThud = ts; }
         const onGround = game.clearance(main.body) < 0.5;
         if (airborne && onGround && inward > 0.8 && ts - lastThud > 150) {
           if (!landedOnce) { landedOnce = true; sound.quake(); shake = 1.8; }
@@ -524,7 +541,8 @@
         }
         airborne = !onGround;
         if (game.steps % 3 === 0) {
-          trail.push({ x: main.body.position.x, y: main.body.position.y });
+          const m = game.units[0];
+          trail.push({ x: m.body.position.x, y: m.body.position.y });
           if (trail.length > 3000) trail.splice(0, trail.length - 3000);
         }
         if (performance.now() - t0 > STEP_BUDGET_MS) { accum = Math.min(accum, STEP); break; }
@@ -537,10 +555,11 @@
 
     const cur = poses();
     const ps = cur.map((c, i) => {
-      const p = prevPoses[i] || c;
+      const p = prevPoses.length === cur.length ? prevPoses[i] : c;   // 分解した瞬間は補間しない
       return { x: p.x + (c.x - p.x) * alpha, y: p.y + (c.y - p.y) * alpha, a: p.a + (c.a - p.a) * alpha };
     });
 
+    if (earthMode() && (phase === 'fly' || phase === 'done')) updateReentry(dt);
     const k = 1 - Math.pow(0.04, dt / 1000);
     if (phase === 'fly' || phase === 'done') {
       const u = camUnit();
@@ -604,7 +623,7 @@
     ctx.scale(1 / KPU, 1 / KPU);
     ctx.translate(-u.com.x * KPU + u.off[0], -u.com.y * KPU + u.off[1]);
     ctx.beginPath();
-    for (const ring of [u.outline, ...(u.holes || [])]) {
+    for (const ring of (u.rings || [u.outline, ...(u.holes || [])])) {
       ring.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
       ctx.closePath();
     }
@@ -735,6 +754,96 @@
     if (pref.islands) drawOffscreenArrows(game.units.map((u, i) => ({ x: toX(ps[i].x), y: toY(ps[i].y) })));
   }
 
+  // ===== 大気圏突入の演出(見た目と音だけ。物理には影響しない) =====
+  // 一度大気圏の外(高度120km以上)に出て、また大気に入ってきた島が燃える
+  // 燃える場所: 普通の県・島はそれ自体、島の塊は中の島ひとつひとつ
+  function flamePoints(u, p) {
+    const R0 = PrefPhysics.radiusOf(u.body);
+    if (!u.subs) return [{ x: p.x, y: p.y, r: R0 }];
+    const c = Math.cos(p.a), s = Math.sin(p.a);
+    return u.subs.filter(t => t.r > 3).map(t => ({ x: p.x + t.local.x * c - t.local.y * s, y: p.y + t.local.x * s + t.local.y * c, r: t.r }));
+  }
+  function updateReentry(dt) {
+    for (const u of game.units) {
+      let st = reentry.get(u);
+      if (!st) { st = { space: false, on: false, I: 0, slow: 0 }; reentry.set(u, st); }
+      const altKm = game.clearance(u.body) * KPU;
+      const speed = game.realSpeedKmS(Matter.Body.getSpeed(u.body));
+      if (altKm > 120) { if (!st.space || st.slow <= 0) st.slow = 4000; st.space = true; }   // スローモーションは1回の突入につき最大4秒
+      // 宇宙から落ちてきて、大気圏に近づいた(スローモーションを始める合図)
+      const dxC = u.body.position.x - game.C.x, dyC = u.body.position.y - game.C.y, vv = Matter.Body.getVelocity(u.body);
+      const falling = (vv.x * dxC + vv.y * dyC) < 0;
+      st.near = st.space && !u.touched && u.status === 'flying' && falling && altKm < 400;
+      let target = 0;
+      if (st.space && falling && !u.touched && u.status === 'flying' && altKm < 120 && speed > 2) {
+        target = Math.min(1, (120 - altKm) / 90) * Math.min(1.2, Math.max(0.3, speed / 7));
+      }
+      st.I += (target - st.I) * Math.min(1, dt / 60);
+      if (target > 0.15 && !st.on) { st.on = true; if (u === game.units[0]) sound.reentry(); }
+      if (target === 0) st.on = false;
+      // 火の粉: 先端あたりから生まれて、その場に残って消えていく(=後ろに流れて見える)
+      if (st.I > 0.1) {
+        const v = Matter.Body.getVelocity(u.body), sp = Math.hypot(v.x, v.y) || 1;
+        const pts = flamePoints(u, { x: u.body.position.x, y: u.body.position.y, a: u.body.angle });
+        const n = Math.max(1, Math.round(st.I * 6 / Math.sqrt(pts.length)));
+        for (const q of pts) for (let i = 0; i < n; i++) {
+          const R = q.r, a = Math.random() * Math.PI * 2, r = Math.random() * R * 0.7;
+          sparks.push({ x: q.x + v.x / sp * R * 0.4 + Math.cos(a) * r, y: q.y + v.y / sp * R * 0.4 + Math.sin(a) * r,
+            vx: (Math.random() - 0.5) * R * 0.02, vy: (Math.random() - 0.5) * R * 0.02, life: 1, size: 1 + Math.random() * 2 });
+        }
+      }
+    }
+    for (const p of sparks) { p.x += p.vx; p.y += p.vy; p.life -= dt / 700; }
+    sparks = sparks.filter(p => p.life > 0).slice(-1200);
+  }
+  function drawReentry(u, p, layer) {
+    const st = reentry.get(u);
+    if (!st || st.I < 0.02) return;
+    const I = Math.min(1, st.I);
+    const v = Matter.Body.getVelocity(u.body), sp = Math.hypot(v.x, v.y);
+    if (sp < 1e-6) return;
+    const dx = v.x / sp, dy = v.y / sp, nx = -dy, ny = dx;
+    for (const q of flamePoints(u, p)) drawFlameAt(q, q.r, I, dx, dy, nx, ny, layer);
+  }
+  function drawFlameAt(p, R, I, dx, dy, nx, ny, layer) {
+    ctx.save();
+    if (layer === 'flame') {
+      // 後ろに長く伸びる炎の尾(外側の赤い炎と、内側の黄白い芯)
+      const tongue = (len, wid, stops) => {
+        const fx = p.x + dx * R * 0.3, fy = p.y + dy * R * 0.3, tx = p.x - dx * len, ty = p.y - dy * len;
+        const g = ctx.createLinearGradient(fx, fy, tx, ty);
+        stops.forEach(([o, c]) => g.addColorStop(o, c));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(fx + nx * wid, fy + ny * wid);
+        ctx.bezierCurveTo(p.x - dx * len * 0.2 + nx * wid * 1.25, p.y - dy * len * 0.2 + ny * wid * 1.25,
+          p.x - dx * len * 0.7 + nx * wid * 0.35, p.y - dy * len * 0.7 + ny * wid * 0.35, tx, ty);
+        ctx.bezierCurveTo(p.x - dx * len * 0.7 - nx * wid * 0.35, p.y - dy * len * 0.7 - ny * wid * 0.35,
+          p.x - dx * len * 0.2 - nx * wid * 1.25, p.y - dy * len * 0.2 - ny * wid * 1.25, fx - nx * wid, fy - ny * wid);
+        ctx.closePath(); ctx.fill();
+      };
+      const L = R * (1.6 + 4.4 * I), w = R * (0.85 + 0.3 * I);
+      tongue(L, w, [[0, `rgba(255,140,40,${0.8 * I})`], [0.45, `rgba(232,64,24,${0.5 * I})`], [1, 'rgba(200,40,20,0)']]);
+      tongue(L * 0.6, w * 0.55, [[0, `rgba(255,248,210,${0.95 * I})`], [0.5, `rgba(255,205,80,${0.6 * I})`], [1, 'rgba(255,150,50,0)']]);
+    } else {
+      // 進行方向の先端で光る衝撃波
+      const cx = p.x + dx * R * 0.6, cy = p.y + dy * R * 0.6, rr = R * (0.7 + 0.5 * I);
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
+      g.addColorStop(0, `rgba(255,252,225,${0.8 * I})`); g.addColorStop(0.45, `rgba(255,175,60,${0.45 * I})`); g.addColorStop(1, 'rgba(255,100,30,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawSparks(s) {
+    if (!sparks.length) return;
+    ctx.save();
+    for (const p of sparks) {
+      ctx.fillStyle = `rgba(255,${110 + Math.round(p.life * 130)},40,${p.life})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size / s, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // ===== 地球モードの描画 =====
   function drawEarth(ps) {
     const s = cam.scale;
@@ -794,7 +903,10 @@
     }
     // 県(島)。宇宙では輪郭を明るくして、暗い背景でも見えるように
     shapeStroke = dark > 0.5 ? '#e8f0ff' : '#1f2440';
+    game.units.forEach((u, i) => drawReentry(u, ps[i], 'flame'));
     game.units.forEach((u, i) => drawUnitShape(u, ps[i], s));
+    game.units.forEach((u, i) => drawReentry(u, ps[i], 'glow'));
+    drawSparks(s);
     shapeStroke = '#1f2440';
     ctx.restore();
 
