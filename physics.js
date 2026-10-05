@@ -58,7 +58,7 @@
     Body.setPosition(body, { x: startX, y: startY });
     Composite.add(engine.world, [ground, backWall, body]);
 
-    const state = { engine, body, com, size, startX, startY, launched: false, settled: false, steps: 0, still: 0, maxX: 0, peakY: 0 };
+    const state = { engine, body, com, size, startX, startY, path1s: 0, launched: false, settled: false, steps: 0, still: 0, maxX: 0, peakY: 0 };
 
     // 狙い: 発射角と同じだけ県を傾ける(0°で本来の向き)。地面にめり込むなら持ち上げる
     state.aim = function (angleDeg) {
@@ -105,7 +105,10 @@
       if (!state.launched || state.settled) return;
       // 速いときは1コマを細かく刻んで計算する(着地で地面に深くめり込むのを防ぐ)
       const n = Math.min(MAX_SUBSTEPS, Math.max(1, Math.ceil(Body.getSpeed(body) / MAX_MOVE)));
+      const before = { x: body.position.x, y: body.position.y };
       for (let i = 0; i < n; i++) subStep(dt / n, 1 / n);
+      // 発射速度の計測(表示専用。物理には影響しない): 最初の1秒(60コマ)で進んだ道のり
+      if (state.steps < 60) state.path1s += Math.hypot(body.position.x - before.x, body.position.y - before.y) * KM_PER_UNIT;
       state.steps++;
       // 接地中は地面の抵抗(転がり抵抗)をかける
       if (body.bounds.max.y > GROUND_Y - 0.5) {
@@ -122,6 +125,9 @@
       if (state.steps > 30 && sp < 0.03 && av < 0.0008) state.still++; else state.still = 0;
       if (state.still > 40 || (state.touched && state.steps - state.touchStep > 900) || state.steps > 60 * 40) state.settled = true;
     };
+
+    // 発射速度(km/s): 最初の1秒間の平均の速さ。1秒未満で止まったら、止まるまでの平均
+    state.launchSpeed = () => state.path1s / (Math.max(1, Math.min(60, state.steps)) / 60);
 
     // 記録は、発射位置から県の一番前の端まで(大きい県ほど有利)
     state.rawDistanceKm = () => (body.bounds.max.x - startX) * KM_PER_UNIT;
