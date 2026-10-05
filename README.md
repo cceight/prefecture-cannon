@@ -18,7 +18,8 @@
 | --- | --- |
 | `index.html` | ゲーム本体(画面・入力・描画) |
 | `physics.js` | 物理コア(Matter.js 0.20.0 を CDN から読み込み) |
-| `shapes.js` | 都道府県の形データ(本土のみ・km単位) |
+| `shapes.js` | 都道府県の形データ(本土のみ・km単位、滋賀県は琵琶湖を除く) |
+| `landmarks.js` | 結果画面の「○○から △△ くらいの距離」に使う場所と県庁所在地 |
 | `bgm.mp3` | BGM「ひとりぼっちの宇宙紀行」 |
 
 ## 公開(GitHub Pages)
@@ -29,3 +30,5 @@
 ## 形データの出典
 
 [dataofjapan/land](https://github.com/dataofjapan/land) の `japan.geojson`(国土数値情報ベース)を、各県の本土ポリゴンだけ取り出して簡略化したもの。離島は含まない。
+
+琵琶湖の形は [Natural Earth](https://www.naturalearthdata.com/)(パブリックドメイン)の湖データを使用。

@@ -94,11 +94,11 @@
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
-  <p class="credit">BGM「ひとりぼっちの宇宙紀行」／ 地図データ: dataofjapan/land(国土数値情報ベース)</p>
+  <p class="credit">BGM「ひとりぼっちの宇宙紀行」／ 地図データ: dataofjapan/land(国土数値情報ベース)、琵琶湖: Natural Earth</p>
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=10" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=11" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -129,8 +129,9 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=10"></script>
-<script src="physics.js?v=10"></script>
+<script src="shapes.js?v=11"></script>
+<script src="physics.js?v=11"></script>
+<script src="landmarks.js?v=11"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -150,14 +151,21 @@
     return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2 / PrefPhysics.KM_PER_UNIT;
   }));
   const regionOf = id => REGIONS.find(r => id >= r.ids[0] && id <= r.ids[1]);
-  // 飛距離の目安になる、だいたいの直線距離(km)
-  const LANDMARKS = [
-    [8, '東京→横浜'], [50, '東京→八王子'], [100, '東京→宇都宮'], [400, '東京→大阪'], [500, '東京→京都・大阪あたり'],
-    [830, '東京→札幌'], [880, '東京→福岡'], [1160, '東京→ソウル'], [1550, '東京→那覇'], [1770, '東京→上海'],
-    [2100, '東京→台北'], [2900, '東京→香港'], [4600, '東京→バンコク'], [5300, '東京→シンガポール'], [6200, '東京→ホノルル'],
-    [7800, '東京→シドニー'], [8900, '東京→サンフランシスコ'], [9600, '東京→ロンドン'], [9700, '東京→パリ'],
-    [10900, '東京→ニューヨーク'], [14000, '東京→ケープタウン'], [18500, '東京→サンパウロ'], [20000, '地球の裏側'],
-  ];
+  // 飛距離の目安: 飛ばした県の県庁所在地から、記録に近い距離(±6%)にある場所をランダムに1つ選ぶ
+  const EARTH_R = 6371;
+  function greatCircleKm(lat1, lon1, lat2, lon2) {
+    const r = Math.PI / 180, dLat = (lat2 - lat1) * r, dLon = (lon2 - lon1) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function pickLandmark(prefId, km) {
+    const [home, lat, lon] = window.PREF_HOME[prefId];
+    const cand = window.LANDMARKS.filter(l => l[0] !== home).map(l => ({ name: l[0], where: l[1], km: greatCircleKm(lat, lon, l[2], l[3]) }));
+    const near = cand.filter(c => Math.abs(c.km - km) <= km * 0.06);
+    const pool = near.length ? near : [cand.sort((a, b) => Math.abs(a.km - km) - Math.abs(b.km - km))[0]];
+    const c = pool[Math.floor(Math.random() * pool.length)];
+    return { home, place: c.where ? `${c.name}（${c.where}）` : c.name };
+  }
 
   // ===== 保存(端末内の自己ベスト) =====
   const store = {
@@ -173,8 +181,8 @@
     const xs = p.outline.map(v => v[0]), ys = p.outline.map(v => v[1]);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
     const pad = Math.max(maxX - minX, maxY - minY) * 0.06;
-    const d = 'M' + p.outline.map(v => v[0] + ' ' + v[1]).join('L') + 'Z';
-    return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="${color}" stroke="#1f2440" stroke-width="${(maxX - minX) / 40}" stroke-linejoin="round"/></svg>`;
+    const d = [p.outline, ...(p.holes || [])].map(r => 'M' + r.map(v => v[0] + ' ' + v[1]).join('L') + 'Z').join('');
+    return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><path d="${d}" fill="${color}" fill-rule="evenodd" stroke="#1f2440" stroke-width="${(maxX - minX) / 40}" stroke-linejoin="round"/></svg>`;
   }
   function renderTabs() {
     const names = ['すべて', ...REGIONS.map(r => r.name)];
@@ -505,9 +513,11 @@
     ctx.scale(s / KPU, s / KPU);
     ctx.translate(-game.com.x * KPU + pref.off[0], -game.com.y * KPU + pref.off[1]);
     ctx.beginPath();
-    pref.outline.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
-    ctx.closePath();
-    ctx.fillStyle = col; ctx.fill();
+    for (const ring of [pref.outline, ...(pref.holes || [])]) {
+      ring.forEach((v, i) => i ? ctx.lineTo(v[0], v[1]) : ctx.moveTo(v[0], v[1]));
+      ctx.closePath();
+    }
+    ctx.fillStyle = col; ctx.fill('evenodd');
     ctx.lineWidth = 2.5 * KPU / s; ctx.strokeStyle = '#1f2440'; ctx.lineJoin = 'round'; ctx.stroke();
     ctx.restore();
     // 県庁所在地(=重心、回転の中心)の★
@@ -548,7 +558,7 @@
     const prev = best[pref.id];
     const isNew = !prev || d > prev.d;
     if (isNew && d > 0) { best[pref.id] = { d, a: angle, p: power }; store.set(best); }
-    const lm = LANDMARKS.filter(l => l[0] <= d).pop();
+    const lm = d >= 1 ? pickLandmark(pref.id, d) : null;
     setTimeout(() => {
       $('rName').textContent = pref.name + ' の飛距離';
       $('rDist').textContent = fmt(d);
@@ -556,7 +566,7 @@
       const v0 = Math.round(game.launchSpeed()).toLocaleString();
       $('rSpec').innerHTML = `角度 ${angle}° ／ パワー ${power}%<br>発射速度 ${v0} km/s`;
       $('rBadge').innerHTML = isNew && d > 0 ? '<span class="nb">自己ベスト更新！</span>' : (prev ? `<div class="cmp">ベストは ${fmt(prev.d)} km</div>` : '');
-      $('rCmp').textContent = raw < 0 ? '後ろに転がっちゃったわね…' : (lm ? `だいたい「${lm[1]}」くらいの距離` : 'まだ近所ね');
+      $('rCmp').textContent = raw < 0 ? '後ろに転がっちゃったわね…' : (lm ? `${lm.home}から ${lm.place} くらいの距離` : 'まだ近所ね');
       const text = `${pref.name}を 発射速度${v0}km/s で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
       const url = location.href.split('#')[0].split('?')[0];
       $('postBtn').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(text) + (url.startsWith('http') ? '&url=' + encodeURIComponent(url) : '');
