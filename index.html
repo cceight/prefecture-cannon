@@ -169,7 +169,7 @@
 </section>
 
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=15" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=16" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -210,9 +210,9 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=15"></script>
-<script src="physics.js?v=15"></script>
-<script src="landmarks.js?v=15"></script>
+<script src="shapes.js?v=16"></script>
+<script src="physics.js?v=16"></script>
+<script src="landmarks.js?v=16"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -317,7 +317,7 @@
   $('modeEarth').addEventListener('click', () => setMode('earth'));
 
   // ===== ランキング(通常モードのみ。Cloudflare Workers + D1) =====
-  const RANKING_API = '';   // Cloudflare の Worker の URL(例: https://prefecture-cannon-ranking.xxxx.workers.dev)
+  const RANKING_API = 'https://prefecture-cannon-ranking.chrischangbeil.workers.dev';   // Cloudflare の Worker の URL(例: https://prefecture-cannon-ranking.xxxx.workers.dev)
   const rankingOn = !!RANKING_API;
   const ALL_PREFS = [...SHAPES, ...TRUE_PREFS];
   const prefName = id => (getPref(id) || {}).name || '?';
