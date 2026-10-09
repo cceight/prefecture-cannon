@@ -19,6 +19,7 @@
     --line: #d9cfb8;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); overflow: hidden;
     font-family: "M PLUS Rounded 1c", system-ui, sans-serif; font-weight: 500; }
   button { font: inherit; color: inherit; cursor: pointer; }
@@ -99,6 +100,39 @@
   .btn.main { background: var(--red); color: #fff; }
   .btn.x { background: var(--ink); color: var(--paper); }
   .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* ランキング登録(結果画面) */
+  .reg { margin-top: 14px; display: grid; gap: 8px; }
+  .reg form { display: flex; gap: 6px; }
+  .reg input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink); }
+  .reg input:focus-visible, .rank-head select:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .reg form .btn { padding: 8px 12px; white-space: nowrap; }
+  .reg-msg { font-size: 13px; font-weight: 800; min-height: 1.2em; margin: 0; }
+  .reg-msg.err { color: var(--red); }
+  .btn.gold { background: var(--gold); }
+
+  /* ランキング画面 */
+  .rank-open { border: 2px solid var(--ink); background: var(--gold); border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 13px; box-shadow: 3px 3px 0 var(--ink); }
+  .rank-open:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  #ranking { overflow-y: auto; padding: 20px 16px 72px; }
+  .rank-wrap { max-width: 640px; margin: 0 auto; }
+  .rank-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .rank-title { font-family: "Dela Gothic One", sans-serif; font-size: clamp(26px, 6vw, 38px); margin: 0; color: var(--red); text-shadow: 2px 2px 0 var(--ink); }
+  .rank-back { border: 2px solid var(--ink); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+  .rank-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .rank-head select { font: inherit; font-size: 14px; font-weight: 800; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); color: var(--ink); }
+  .rank-list { list-style: none; margin: 0; padding: 0; background: var(--card); border: 2px solid var(--ink); border-radius: 14px; box-shadow: 4px 4px 0 var(--ink); overflow: hidden; }
+  .rank-list li { display: grid; grid-template-columns: 2.6em 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .rank-list li:first-child { border-top: 0; }
+  .rank-list .no { font-family: "Dela Gothic One", sans-serif; font-size: 18px; text-align: center; }
+  .rank-list li:nth-child(1) .no { color: #c8961a; } .rank-list li:nth-child(2) .no { color: #8c8c96; } .rank-list li:nth-child(3) .no { color: #b06a3b; }
+  .rank-list .who { min-width: 0; }
+  .rank-list .nm { font-weight: 800; overflow-wrap: anywhere; }
+  .rank-list .sub { font-size: 11px; color: var(--muted); }
+  .rank-list .km { font-family: "Dela Gothic One", sans-serif; font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rank-list .km small { font-family: "M PLUS Rounded 1c"; font-size: 11px; margin-left: 2px; }
+  .rank-msg { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; margin: 0; }
 </style>
 </head>
 <body>
@@ -113,14 +147,29 @@
       <button id="modeEarth" class="earth" aria-pressed="false">地球モード</button>
     </div>
     <div class="mode-note" id="modeNote"></div>
+    <button class="rank-open" id="rankOpen" hidden>ランキング</button>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
   <p class="credit">BGM「ひとりぼっちの宇宙紀行」／ 地図データ: dataofjapan/land(国土数値情報ベース)、琵琶湖: Natural Earth<br>地球モード: 半径6,371kmの丸い地球、地表で9.8m/s²の重力、上空ほど薄くなる大気。画面は約452倍速のタイムラプス。</p>
 </section>
 
+<section id="ranking" class="screen">
+  <div class="rank-wrap">
+    <div class="rank-top">
+      <h2 class="rank-title">ランキング</h2>
+      <button class="rank-back" id="rankBack">← 県を選ぶ</button>
+    </div>
+    <div class="rank-head">
+      <select id="rankPref" aria-label="ランキングの種類"></select>
+    </div>
+    <ol class="rank-list" id="rankList"></ol>
+    <p class="rank-msg" id="rankMsg"></p>
+  </div>
+</section>
+
 <button class="mute" id="muteBtn" aria-pressed="false">♪ 音あり</button>
-<audio id="bgm" src="bgm.mp3?v=14" loop preload="auto"></audio>
+<audio id="bgm" src="bgm.mp3?v=15" loop preload="auto"></audio>
 
 <section id="play" class="screen">
   <canvas id="cv"></canvas>
@@ -142,6 +191,15 @@
       <div class="spec" id="rSpec"></div>
       <div id="rBadge"></div>
       <div class="cmp" id="rCmp"></div>
+      <div class="reg" id="regBox" hidden>
+        <button class="btn gold" id="regOpen">ランキングに登録</button>
+        <form id="regForm" hidden>
+          <input id="regName" type="text" maxlength="12" placeholder="名前(12文字まで)" autocomplete="nickname" aria-label="プレイヤー名">
+          <button class="btn main" id="regSend" type="submit">登録する</button>
+        </form>
+        <p class="reg-msg" id="regMsg" aria-live="polite"></p>
+        <button class="btn" id="regView" type="button" hidden>ランキングを見る</button>
+      </div>
       <div class="btns">
         <button class="btn main" id="againBtn">もう一回撃つ</button>
         <a class="btn x" id="postBtn" href="https://x.com/intent/tweet" target="_blank" rel="noopener">Twitterに記録を投稿</a>
@@ -152,9 +210,9 @@
 </section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
-<script src="shapes.js?v=14"></script>
-<script src="physics.js?v=14"></script>
-<script src="landmarks.js?v=14"></script>
+<script src="shapes.js?v=15"></script>
+<script src="physics.js?v=15"></script>
+<script src="landmarks.js?v=15"></script>
 <script>
 (() => {
   const SHAPES = window.PREF_SHAPES;
@@ -257,6 +315,93 @@
   function setMode(m) { mode = m; save('prefCannonMode', m); renderMode(); renderGrid(); }
   $('modeFlat').addEventListener('click', () => setMode('flat'));
   $('modeEarth').addEventListener('click', () => setMode('earth'));
+
+  // ===== ランキング(通常モードのみ。Cloudflare Workers + D1) =====
+  const RANKING_API = '';   // Cloudflare の Worker の URL(例: https://prefecture-cannon-ranking.xxxx.workers.dev)
+  const rankingOn = !!RANKING_API;
+  const ALL_PREFS = [...SHAPES, ...TRUE_PREFS];
+  const prefName = id => (getPref(id) || {}).name || '?';
+  $('rankOpen').hidden = !rankingOn;
+  $('rankPref').innerHTML = '<option value="all">全体ランキング</option>' +
+    ALL_PREFS.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  async function api(path, opts) {
+    const res = await fetch(RANKING_API.replace(/\/$/, '') + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '通信に失敗しました');
+    return data;
+  }
+  let rankReq = 0;
+  async function loadRanking(pref) {
+    const my = ++rankReq;
+    $('rankList').innerHTML = ''; $('rankMsg').textContent = '読み込み中…';
+    try {
+      const data = await api('/ranking?pref=' + encodeURIComponent(pref));
+      if (my !== rankReq) return;
+      const list = $('rankList');
+      if (!data.entries.length) { $('rankMsg').textContent = 'まだ記録がないわ。最初の1件を登録して！'; return; }
+      $('rankMsg').textContent = '';
+      data.entries.forEach((e, i) => {
+        const li = document.createElement('li');
+        const no = document.createElement('div'); no.className = 'no'; no.textContent = i + 1;
+        const who = document.createElement('div'); who.className = 'who';
+        const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = e.name;
+        const sub = document.createElement('div'); sub.className = 'sub';
+        sub.textContent = (pref === 'all' ? prefName(e.prefId) + ' ／ ' : '') + (e.angle != null ? `${e.angle}° ・ ${e.power}%` : '');
+        who.append(nm, sub);
+        const km = document.createElement('div'); km.className = 'km';
+        km.append(fmt(e.distance)); const u = document.createElement('small'); u.textContent = 'km'; km.append(u);
+        li.append(no, who, km); list.append(li);
+      });
+    } catch (err) {
+      if (my === rankReq) $('rankMsg').textContent = 'ランキングを読み込めなかったわ。通信を確かめて、もう一度開いてね';
+    }
+  }
+  function openRanking(pref = 'all') {
+    for (const id of ['select', 'play']) $(id).classList.remove('on');
+    $('ranking').classList.add('on');
+    $('rankPref').value = String(pref);
+    loadRanking(String(pref));
+  }
+  $('rankOpen').addEventListener('click', () => openRanking('all'));
+  $('rankPref').addEventListener('change', e => loadRanking(e.target.value));
+  $('rankBack').addEventListener('click', () => { $('ranking').classList.remove('on'); $('select').classList.add('on'); renderGrid(); });
+
+  // 結果画面の「ランキングに登録」
+  let regRecord = null;
+  function setupRegister(record) {
+    regRecord = record;
+    $('regBox').hidden = !record;
+    $('regOpen').hidden = false; $('regForm').hidden = true; $('regView').hidden = true;
+    $('regMsg').textContent = ''; $('regMsg').className = 'reg-msg';
+    $('regSend').disabled = false;
+  }
+  $('regOpen').addEventListener('click', () => {
+    $('regOpen').hidden = true; $('regForm').hidden = false;
+    $('regName').value = load('prefCannonName', '');
+    $('regName').focus();
+  });
+  $('regForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('regName').value.trim();
+    if (!name) { $('regMsg').textContent = '名前を入れてね'; $('regMsg').className = 'reg-msg err'; return; }
+    if (!regRecord) return;
+    $('regSend').disabled = true; $('regMsg').className = 'reg-msg'; $('regMsg').textContent = '登録中…';
+    try {
+      const r = await api('/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ...regRecord }) });
+      save('prefCannonName', name);
+      $('regForm').hidden = true;
+      $('regMsg').textContent = `登録したわ！ 全体 ${r.overallRank}位 ／ ${prefName(regRecord.prefId)} ${r.prefRank}位`;
+      $('regView').hidden = false;
+      regRecord = null;
+    } catch (err) {
+      $('regSend').disabled = false;
+      $('regMsg').className = 'reg-msg err';
+      $('regMsg').textContent = '登録できなかったわ。通信を確かめて、もう一度押してね';
+    }
+  });
+  let regViewPref = 'all';
+  $('regView').addEventListener('click', () => openRanking(regViewPref));
   $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; filter = +b.dataset.i; renderTabs(); renderGrid(); });
   $('grid').addEventListener('click', e => { const b = e.target.closest('.pref'); if (b) startGame(+b.dataset.id); });
   const fmt = v => v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1);
@@ -457,6 +602,7 @@
   cv.addEventListener('pointerdown', e => { e.preventDefault(); onTap(); });
   window.addEventListener('keydown', e => {
     if (!$('play').classList.contains('on')) return;
+    if (e.target.closest && e.target.closest('input, select, textarea')) return;
     if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if ($('result').classList.contains('on')) again(); else onTap(); }
   });
   $('backBtn').addEventListener('click', toSelect);
@@ -990,6 +1136,10 @@
       else text = `${pref.name}を 発射速度${speed}km/s で撃ったら ${fmt(d)}km 飛んだ！\n#都道府県キャノン`;
       const url = location.href.split('#')[0].split('?')[0];
       $('postBtn').href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(text) + (url.startsWith('http') ? '&url=' + encodeURIComponent(url) : '');
+      // ランキング登録(通常モードで、地面に落ちて記録が出たときだけ)
+      const canRegister = rankingOn && !earth && outcome === 'landed' && d > 0;
+      regViewPref = pref.id;
+      setupRegister(canRegister ? { prefId: pref.id, distance: Math.round(d * 10) / 10, angle, power } : null);
       $('result').classList.add('on');
       sound.jingle(isNew);
     }, 700);
